@@ -95,7 +95,7 @@ All data ligger i `data/mettings.db` (SQLite). Denne filen er ikke sjekket inn i
 - Sesjoner lagres i minne — en omstart av tjenesten logger ut admin (uproblematisk for et internt verktøy, men kan byttes til en filbasert sesjonslagring senere om ønskelig).
 - E-postbekreftelse sendes som en ekte kalenderinvitasjon (`METHOD:REQUEST`), slik at booker kan trykke "Godta" og få møtet inn i sin egen kalender. Avlysning sendes som `METHOD:CANCEL`.
 - Overlappende bookinger på samme rom avvises på serversiden.
-- Frontend bruker [FullCalendar](https://fullcalendar.io/) lastet fra CDN — krever internettilgang for at kalendervisningen skal fungere. Vurder å laste ned biblioteket lokalt (`public/vendor/`) hvis Pi-en kjører uten internett.
+- Frontend bruker [FullCalendar](https://fullcalendar.io/), som er selv-hostet under `public/vendor/fullcalendar/` — ingen internettilgang er nødvendig for at kalendervisningen skal fungere når tjenesten kjører.
 
 ## Videre arbeid (forslag)
 
