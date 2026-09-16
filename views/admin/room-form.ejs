@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= room ? 'Rediger rom' : 'Nytt rom' %> – Møteromsbooking</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a href="/admin">Møteromsbooking – Admin</a>
+  </header>
+  <main style="max-width:520px;">
+    <div class="card">
+      <h1><%= room ? 'Rediger rom' : 'Nytt rom' %></h1>
+      <% if (error) { %><div class="error-message"><%= error %></div><% } %>
+      <form method="post" action="<%= room && room.id ? '/admin/rooms/' + room.id : '/admin/rooms' %>">
+        <div class="field">
+          <label for="name">Navn</label>
+          <input type="text" id="name" name="name" required value="<%= room ? room.name : '' %>" />
+        </div>
+        <div class="field">
+          <label for="location">Sted / etasje</label>
+          <input type="text" id="location" name="location" value="<%= room && room.location ? room.location : '' %>" />
+        </div>
+        <div class="field">
+          <label for="capacity">Kapasitet (antall personer)</label>
+          <input type="number" id="capacity" name="capacity" min="1" value="<%= room && room.capacity ? room.capacity : '' %>" />
+        </div>
+        <div class="field">
+          <label for="description">Beskrivelse</label>
+          <textarea id="description" name="description" rows="3"><%= room && room.description ? room.description : '' %></textarea>
+        </div>
+        <div class="field">
+          <label for="color">Farge i kalender</label>
+          <input type="color" id="color" name="color" value="<%= room && room.color ? room.color : '#2563eb' %>" />
+        </div>
+        <button type="submit" class="button">Lagre</button>
+        <a class="button secondary" href="/admin">Avbryt</a>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

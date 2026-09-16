@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <meta charset="UTF-8" />
+  <title>Opprett admin – Møteromsbooking</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <main style="max-width:420px;">
+    <div class="card">
+      <h1>Opprett admin-bruker</h1>
+      <p class="muted">Dette er første gangs oppsett. Opprett den første admin-kontoen for intern forvaltning.</p>
+      <% if (error) { %><div class="error-message"><%= error %></div><% } %>
+      <form method="post" action="/admin/setup">
+        <div class="field">
+          <label for="username">Brukernavn</label>
+          <input type="text" id="username" name="username" required autofocus />
+        </div>
+        <div class="field">
+          <label for="password">Passord (minst 8 tegn)</label>
+          <input type="password" id="password" name="password" minlength="8" required />
+        </div>
+        <div class="field">
+          <label for="passwordConfirm">Bekreft passord</label>
+          <input type="password" id="passwordConfirm" name="passwordConfirm" minlength="8" required />
+        </div>
+        <button type="submit" class="button" style="width:100%;">Opprett admin</button>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

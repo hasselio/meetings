@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Admin – Møteromsbooking' }) %>
+</head>
+<body data-timezone="<%= timezone %>">
+  <header class="site-header">
+    <a href="/admin">Møteromsbooking – Admin</a>
+    <nav>
+      <a href="/">Offentlig side</a>
+      <form method="post" action="/admin/logout" style="display:inline;">
+        <button type="submit" style="background:none;border:none;color:white;opacity:0.9;cursor:pointer;font-size:1rem;">Logg ut</button>
+      </form>
+    </nav>
+  </header>
+  <main>
+    <div class="flex-between">
+      <h1>Rom og bookinger</h1>
+      <a class="button" href="/admin/rooms/new">+ Nytt rom</a>
+    </div>
+
+    <% if (rooms.length === 0) { %>
+      <div class="card">Ingen rom er lagt til ennå. Klikk "Nytt rom" for å komme i gang.</div>
+    <% } else { %>
+      <div class="room-list-admin">
+        <% rooms.forEach(function(room, i) { %>
+          <a href="#" class="tab room-tab <%= i === 0 ? 'active' : '' %>" data-room-id="<%= room.id %>" data-room-color="<%= room.color %>">
+            <%= room.name %>
+          </a>
+        <% }) %>
+      </div>
+
+      <div class="card flex-between" id="roomActions">
+        <div id="roomMeta" class="muted"></div>
+        <div>
+          <a class="button secondary" id="editRoomLink" href="#">Rediger rom</a>
+          <form id="deleteRoomForm" method="post" style="display:inline;" onsubmit="return confirm('Slette dette rommet? Dette fjerner også alle bookinger for rommet.');">
+            <button type="submit" class="button danger">Slett rom</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="calendar"></div>
+    <% } %>
+  </main>
+
+  <div class="modal-backdrop" id="detailsModal">
+    <div class="modal">
+      <h2 id="detailsTitle"></h2>
+      <p><strong>Booket av:</strong> <span id="detailsOrganizer"></span></p>
+      <p><strong>E-post:</strong> <span id="detailsEmail"></span></p>
+      <p><strong>Tid:</strong> <span id="detailsTime"></span></p>
+      <p id="detailsNotesWrap"><strong>Notat:</strong> <span id="detailsNotes"></span></p>
+      <div class="modal-actions">
+        <button type="button" class="button secondary" id="closeDetailsBtn">Lukk</button>
+        <button type="button" class="button danger" id="cancelBookingBtn">Avlys møte</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.ROOMS = <%- JSON.stringify(rooms) %>;
+  </script>
+  <script src="/js/admin-calendar.js"></script>
+</body>
+</html>

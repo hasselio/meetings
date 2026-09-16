@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Møterom – ledig/opptatt' }) %>
+</head>
+<body>
+  <header class="site-header">
+    <a href="/">Møteromsbooking</a>
+    <nav><a href="/admin">Admin</a></nav>
+  </header>
+  <main>
+    <h1>Møterom</h1>
+    <p class="muted">Velg et rom for å se tilgjengelighet og booke et møte.</p>
+
+    <% if (rooms.length === 0) { %>
+      <div class="card">Ingen rom er lagt til ennå. Logg inn som admin for å legge til rom.</div>
+    <% } %>
+
+    <div class="room-grid">
+      <% rooms.forEach(function(room) { %>
+        <a class="card room-card" href="/rom/<%= room.id %>" style="text-decoration:none; color:inherit;">
+          <h3><%= room.name %></h3>
+          <div class="meta">
+            <%= room.location || '' %><%= room.capacity ? ' · ' + room.capacity + ' personer' : '' %>
+          </div>
+          <span class="status-pill <%= room.free ? 'free' : 'busy' %>">
+            <span class="dot"></span>
+            <%= room.free ? 'Ledig nå' : 'Opptatt nå' %>
+          </span>
+        </a>
+      <% }) %>
+    </div>
+  </main>
+</body>
+</html>

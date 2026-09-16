@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: room.name + ' – Møteromsbooking' }) %>
+</head>
+<body data-room-id="<%= room.id %>" data-timezone="<%= timezone %>">
+  <header class="site-header">
+    <a href="/">Møteromsbooking</a>
+    <nav><a href="/admin">Admin</a></nav>
+  </header>
+  <main>
+    <p><a href="/">&larr; Alle rom</a></p>
+    <div class="flex-between">
+      <div>
+        <h1 style="margin-bottom:0.2rem;"><%= room.name %></h1>
+        <p class="muted" style="margin-top:0;">
+          <%= room.location || '' %><%= room.capacity ? ' · ' + room.capacity + ' personer' : '' %>
+        </p>
+      </div>
+      <button class="button" id="bookBtn">Book møte</button>
+    </div>
+    <% if (room.description) { %><p><%= room.description %></p><% } %>
+
+    <div id="calendar"></div>
+  </main>
+
+  <div class="modal-backdrop" id="bookingModal">
+    <div class="modal">
+      <h2>Book <%= room.name %></h2>
+      <div id="formError"></div>
+      <form id="bookingForm">
+        <div class="field">
+          <label for="title">Møtetittel</label>
+          <input type="text" id="title" name="title" required maxlength="120" />
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="organizerName">Ditt navn</label>
+            <input type="text" id="organizerName" name="organizerName" required maxlength="80" />
+          </div>
+          <div class="field">
+            <label for="organizerEmail">Din e-post</label>
+            <input type="email" id="organizerEmail" name="organizerEmail" required />
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="start">Start</label>
+            <input type="datetime-local" id="start" name="start" required />
+          </div>
+          <div class="field">
+            <label for="end">Slutt</label>
+            <input type="datetime-local" id="end" name="end" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="notes">Notat (valgfritt)</label>
+          <textarea id="notes" name="notes" rows="2"></textarea>
+        </div>
+        <p class="muted" style="font-size:0.85rem;">
+          Du får en møtebekreftelse med kalenderinvitasjon på e-post.
+        </p>
+        <div class="modal-actions">
+          <button type="button" class="button secondary" id="cancelBtn">Avbryt</button>
+          <button type="submit" class="button">Book møte</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/booking.js"></script>
+</body>
+</html>
