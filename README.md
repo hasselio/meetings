@@ -9,7 +9,7 @@ Bygget med Node.js + Express + SQLite (better-sqlite3) — ingen ekstern databas
 
 ## Kom i gang (lokalt / på Raspberry Pi)
 
-1. Installer Node.js 18+ (på Raspberry Pi OS: `sudo apt install nodejs npm`, eller bruk [nvm](https://github.com/nvm-sh/nvm) for en nyere versjon).
+1. Installer Node.js 20 eller nyere (anbefalt: 22 LTS). Versjonen i Raspberry Pi OS sin `apt` er ofte for gammel, så bruk [nvm](https://github.com/nvm-sh/nvm) eller [NodeSource](https://github.com/nodesource/distributions).
 2. Klon/kopier prosjektet til Pi-en, og installer avhengigheter:
 
    ```bash
@@ -24,9 +24,10 @@ Bygget med Node.js + Express + SQLite (better-sqlite3) — ingen ekstern databas
 
    Viktigst:
    - `SESSION_SECRET` – **påkrevd**, tjenesten starter ikke uten den. Generer en tilfeldig verdi med f.eks. `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`.
-   - `COOKIE_SECURE` – sett til `true` når tjenesten står bak en TLS-terminerende reverse proxy (se under), slik at innloggingscookien kun sendes over HTTPS.
+   - `COOKIE_SECURE` – sett til `true` når tjenesten står bak en TLS-terminerende reverse proxy (se under), slik at innloggingscookien kun sendes over HTTPS. Dette slår også på `trust proxy`, slik at grensene for innloggingsforsøk og tilgangsforespørsler gjelder besøkerens IP og ikke proxyens.
    - `SMTP_*` og `MAIL_FROM_*` – SMTP-konto som skal sende møtebekreftelser (f.eks. et delt e-postalias, eller en transaksjonsepost-tjeneste). Uten SMTP satt opp vil bookinger fortsatt fungere, men det sendes ingen bekreftelse.
-   - `BASE_URL` – URL-en tjenesten nås på (brukes ikke direkte i e-post ennå, men bør stemme for fremtidig bruk).
+   - `BASE_URL` – URL-en tjenesten nås på. Brukes i lenkene i e-poster om admintilgang.
+   - `ADMIN_NOTIFY_EMAIL` – får kopi av nye bookinger og varsel når noen ber om admintilgang.
    - `TIMEZONE` – standard `Europe/Oslo`. Brukes for «ledig til / opptatt til» og dagens tidslinje på forsiden.
    - `APP_NAME` – navnet som vises i toppen og i fanen (standard `Møterom`).
 
@@ -38,7 +39,28 @@ Bygget med Node.js + Express + SQLite (better-sqlite3) — ingen ekstern databas
 
    Tjenesten kjører nå på `http://localhost:3000` (eller porten satt i `.env`).
 
-5. Gå til `/admin` i nettleseren. Første gang blir du bedt om å opprette en admin-bruker (brukernavn + passord). Deretter kan du legge til møterom under "Nytt rom".
+5. Opprett den første administratoren direkte på serveren (passordet tastes inn skjult og lagres kryptert):
+
+   ```bash
+   npm run create-admin
+   ```
+
+   Samme kommando setter nytt passord hvis brukernavnet finnes fra før, nyttig om noen er låst ute.
+
+6. Logg inn på `/admin` og legg til møterom under «Nytt rom».
+
+## Admintilgang
+
+- Det finnes ingen måte å opprette admin fra nettsiden uten godkjenning. Den første administratoren lages med `npm run create-admin`.
+- Andre kan be om tilgang på `/admin/be-om-tilgang` (lenket fra innloggingen). De velger selv brukernavn og passord, og forespørselen havner i kø under **Tilgang** i adminpanelet. Ingen får tilgang før en eksisterende administrator har godkjent.
+- Når forespørselen er behandlet, får personen svar på e-post. Passord-hashen slettes fra forespørselen når den er behandlet.
+- Under **Tilgang** kan administratorer også fjerne andres tilgang. Den som fjernes, logges ut umiddelbart. Man kan ikke fjerne seg selv eller den siste administratoren.
+- Beskyttelse mot roboter og misbruk:
+  - [ALTCHA](https://altcha.org) (proof-of-work, selv-hostet, ingen tredjepart eller sporing, MIT-lisens). Nettleseren løser en liten regneoppgave før skjemaet kan sendes, og hver løsning kan bare brukes én gang.
+  - Et skjult «honeypot»-felt som bare roboter fyller ut.
+  - Maks 5 forespørsler per IP per time, og maks 50 ubehandlede forespørsler i køen.
+  - Innlogging: etter 8 feil passord for samme brukernavn fra samme IP stenges forsøk i 15 minutter.
+- ALTCHA bruker nettleserens Web Crypto API, som bare er tilgjengelig over HTTPS (eller `localhost`). Skjemaet for å be om tilgang krever derfor at tjenesten nås via HTTPS, se under.
 
 ## Kjøre som en systemd-tjeneste på Raspberry Pi
 
@@ -93,7 +115,8 @@ All data ligger i `data/mettings.db` (SQLite). Denne filen er ikke sjekket inn i
 
 ## Arkitektur / begrensninger i denne MVP-versjonen
 
-- Én admin-rolle (ingen forskjellige rettighetsnivåer for flere interne brukere ennå).
+- Én admin-rolle: alle administratorer har samme rettigheter, også til å godkjenne nye.
+- Grensene for forsøk lagres i minnet og nullstilles ved omstart.
 - Sesjoner lagres i minne — en omstart av tjenesten logger ut admin (uproblematisk for et internt verktøy, men kan byttes til en filbasert sesjonslagring senere om ønskelig).
 - E-postbekreftelse sendes som en ekte kalenderinvitasjon (`METHOD:REQUEST`), slik at booker kan trykke "Godta" og få møtet inn i sin egen kalender. Avlysning sendes som `METHOD:CANCEL`.
 - Overlappende bookinger på samme rom avvises på serversiden.
@@ -103,7 +126,8 @@ All data ligger i `data/mettings.db` (SQLite). Denne filen er ikke sjekket inn i
 
 ## Videre arbeid (forslag)
 
-- Flere admin-brukere / rollestyring.
+- Rollestyring (f.eks. egen rolle som kan godkjenne nye administratorer).
+- Bekreftelse av e-postadresse før en tilgangsforespørsel havner i køen.
 - Redigering av eksisterende bookinger (i dag kan admin kun avlyse).
 - Varsling til internt e-postalias ved nye bookinger (`ADMIN_NOTIFY_EMAIL` i `.env` sender allerede en kopi hvis satt).
 - Eksport av bookinger (CSV) for rapportering.

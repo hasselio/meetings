@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Be om admintilgang' }) %>
+  <script src="/vendor/altcha/nb.js" defer></script>
+  <script src="/vendor/altcha/altcha.min.js" defer></script>
+</head>
+<body>
+  <main class="auth">
+    <div class="auth-card auth-card-wide">
+      <%- include('../partials/brand', { tag: 'Admin' }) %>
+      <h1 class="title">Be om admintilgang</h1>
+      <p class="lede">En administrator må godkjenne forespørselen før du kan logge inn. Du får svar på e-post.</p>
+
+      <% if (error) { %>
+        <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= error %></span></div>
+      <% } %>
+
+      <form method="post" action="/admin/be-om-tilgang">
+        <div class="field-row">
+          <div class="field">
+            <label for="name">Navn</label>
+            <input class="input" type="text" id="name" name="name" maxlength="80" autocomplete="name" value="<%= values.name %>" required />
+          </div>
+          <div class="field">
+            <label for="email">E-post</label>
+            <input class="input" type="email" id="email" name="email" maxlength="120" autocomplete="email" value="<%= values.email %>" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="username">Ønsket brukernavn</label>
+          <input class="input" type="text" id="username" name="username" maxlength="40" pattern="[\w.@\-]{3,40}" autocomplete="username" value="<%= values.username %>" required />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="password">Passord <span class="label-hint">(minst 10 tegn)</span></label>
+            <input class="input" type="password" id="password" name="password" minlength="10" autocomplete="new-password" required />
+          </div>
+          <div class="field">
+            <label for="passwordConfirm">Gjenta passord</label>
+            <input class="input" type="password" id="passwordConfirm" name="passwordConfirm" minlength="10" autocomplete="new-password" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="reason">Hvorfor trenger du tilgang? <span class="label-hint">(valgfritt)</span></label>
+          <textarea class="input" id="reason" name="reason" rows="3" maxlength="500" placeholder="F.eks. rolle eller hvem som har bedt deg om å søke"><%= values.reason %></textarea>
+        </div>
+
+        <div class="honeypot" aria-hidden="true">
+          <label for="website">Nettside</label>
+          <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <div class="field captcha">
+          <altcha-widget challenge="/admin/altcha" name="altcha" language="nb" auto="onfocus" configuration='{"hideLogo": true}'></altcha-widget>
+          <noscript><p class="field-error">Skjemaet krever JavaScript for å bekrefte at du ikke er en robot.</p></noscript>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Send forespørsel</button>
+        <p class="panel-note">Passordet lagres kryptert. Administratoren ser navn, e-post, brukernavn og begrunnelse, men aldri passordet.</p>
+      </form>
+
+      <p class="auth-footer"><a href="/admin/login">Tilbake til innlogging</a></p>
+    </div>
+  </main>
+</body>
+</html>

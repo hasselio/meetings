@@ -68,5 +68,8 @@ window.UI = (function () {
     return reset;
   }
 
+  // Skjemaknapper med data-confirm sendes først inn ved andre klikk.
+  document.querySelectorAll('[data-confirm]').forEach((btn) => confirmButton(btn, () => {}));
+
   return { icon, toast, confirmButton };
 })();

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Forespørsel sendt' }) %>
+</head>
+<body>
+  <main class="auth">
+    <div class="auth-card">
+      <%- include('../partials/brand', { tag: 'Admin' }) %>
+      <span class="success-icon"><%- include('../partials/icon', { name: 'check', size: 20 }) %></span>
+      <h1 class="title">Forespørselen er sendt</h1>
+      <p class="lede">En administrator ser på den så snart som mulig. Du får svar på e-post, og kan logge inn når den er godkjent.</p>
+      <a class="btn btn-secondary" href="/">Til romoversikten</a>
+    </div>
+  </main>
+</body>
+</html>

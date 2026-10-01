@@ -1131,6 +1131,196 @@ textarea.input {
   margin-top: 22px;
 }
 
+.nav-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 6px;
+  background: var(--border-strong);
+}
+
+.badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--busy);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.section + .section {
+  margin-top: clamp(32px, 5vw, 48px);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.section-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.request-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.request {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 18px 20px;
+}
+
+.request + .request {
+  border-top: 1px solid var(--border);
+}
+
+.request-compact {
+  align-items: center;
+  padding-block: 14px;
+}
+
+.request-main {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.request-name {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.request-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.request-meta a {
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong);
+}
+
+.request-reason {
+  margin-top: 10px;
+  padding: 10px 12px;
+  max-width: 70ch;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: 14px;
+  color: var(--text-2);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.request-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.request-actions form,
+.request form {
+  margin: 0;
+}
+
+.you {
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.decision {
+  font-weight: 500;
+}
+
+.decision-approved {
+  color: var(--free);
+}
+
+.decision-declined {
+  color: var(--text-3);
+}
+
+.alert-success {
+  background: var(--free-bg);
+  color: var(--free);
+}
+
+.alert code,
+.lede code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  font-size: 0.92em;
+}
+
+.auth-card-wide {
+  max-width: 480px;
+}
+
+.honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.captcha altcha-widget {
+  --altcha-max-width: 100%;
+  --altcha-border-width: 1px;
+  --altcha-border-radius: var(--r-md);
+  --altcha-color-base: var(--surface);
+  --altcha-color-base-content: var(--text);
+  --altcha-border-color: var(--border-strong);
+  --altcha-color-primary: var(--ink);
+  --altcha-color-primary-content: var(--ink-fg);
+  --altcha-color-success: var(--free);
+  --altcha-color-success-content: var(--ink-fg);
+  --altcha-color-error: var(--danger);
+  --altcha-checkbox-border-color: var(--border-strong);
+  --altcha-checkbox-border-radius: 6px;
+  --altcha-shadow: none;
+  display: block;
+  font-family: var(--font);
+}
+
 /* ---------- Drawer ---------- */
 
 .overlay {
@@ -1526,6 +1716,14 @@ textarea.input {
   }
 
   .room-row-arrow {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .nav-text,
+  .nav-divider,
+  .brand-tag {
     display: none;
   }
 }

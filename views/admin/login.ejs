@@ -10,6 +10,13 @@
       <h1 class="title">Logg inn</h1>
       <p class="lede">For å administrere rom og se hvem som har booket.</p>
 
+      <% if (!hasAdmins) { %>
+        <div class="alert alert-warning" role="status">
+          <%- include('../partials/icon', { name: 'alert', size: 16 }) %>
+          <span>Ingen administrator er opprettet ennå. Kjør <code>npm run create-admin</code> på serveren for å lage den første.</span>
+        </div>
+      <% } %>
+
       <% if (error) { %>
         <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= error %></span></div>
       <% } %>
@@ -17,16 +24,19 @@
       <form method="post" action="/admin/login">
         <div class="field">
           <label for="username">Brukernavn</label>
-          <input class="input" type="text" id="username" name="username" autocomplete="username" required autofocus />
+          <input class="input" type="text" id="username" name="username" autocomplete="username" value="<%= username %>" required <%= username ? '' : 'autofocus' %> />
         </div>
         <div class="field">
           <label for="password">Passord</label>
-          <input class="input" type="password" id="password" name="password" autocomplete="current-password" required />
+          <input class="input" type="password" id="password" name="password" autocomplete="current-password" required <%= username ? 'autofocus' : '' %> />
         </div>
         <button type="submit" class="btn btn-primary btn-block">Logg inn</button>
       </form>
 
-      <p class="auth-footer"><a href="/">Tilbake til romoversikten</a></p>
+      <p class="auth-footer">
+        <% if (hasAdmins) { %>Trenger du tilgang? <a href="/admin/be-om-tilgang">Be om tilgang</a> · <% } %>
+        <a href="/">Til romoversikten</a>
+      </p>
     </div>
   </main>
 </body>

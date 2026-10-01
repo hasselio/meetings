@@ -143,6 +143,4 @@
       reset();
     }
   });
-
-  document.querySelectorAll('[data-confirm]').forEach((btn) => UI.confirmButton(btn, () => {}));
 })();

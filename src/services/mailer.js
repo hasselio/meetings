@@ -104,4 +104,33 @@ async function sendBookingCancellation(booking, room) {
   return { sent: true, sequence: nextSequence };
 }
 
-module.exports = { sendBookingConfirmation, sendBookingCancellation };
+async function sendText(to, subject, text) {
+  const t = getTransporter();
+  if (!t || !to) return { sent: false };
+  await t.sendMail({ from: `"${config.mailFromName}" <${config.mailFromEmail}>`, to, subject, text });
+  return { sent: true };
+}
+
+const adminUrl = (path) => `${config.baseUrl.replace(/\/$/, '')}/admin${path}`;
+
+function notifyNewAccessRequest(request) {
+  return sendText(
+    config.adminNotifyEmail,
+    `Ny forespørsel om admintilgang: ${request.name}`,
+    `${request.name} (${request.email}) ber om admintilgang med brukernavnet «${request.username}».\n\n` +
+      (request.reason ? `Begrunnelse:\n${request.reason}\n\n` : '') +
+      `Godkjenn eller avslå her: ${adminUrl('/tilgang')}\n`
+  );
+}
+
+function notifyAccessDecision(request, approved) {
+  return sendText(
+    request.email,
+    approved ? 'Du har fått admintilgang' : 'Forespørselen om admintilgang ble avslått',
+    approved
+      ? `Hei ${request.name},\n\nForespørselen din er godkjent. Logg inn med brukernavnet «${request.username}» og passordet du valgte:\n${adminUrl('/login')}\n`
+      : `Hei ${request.name},\n\nForespørselen din om admintilgang ble avslått. Ta kontakt med en administrator hvis du mener dette er feil.\n`
+  );
+}
+
+module.exports = { sendBookingConfirmation, sendBookingCancellation, notifyNewAccessRequest, notifyAccessDecision };
