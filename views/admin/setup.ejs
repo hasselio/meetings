@@ -1,30 +1,33 @@
 <!DOCTYPE html>
 <html lang="nb">
 <head>
-  <meta charset="UTF-8" />
-  <title>Opprett admin – Møteromsbooking</title>
-  <link rel="stylesheet" href="/css/style.css" />
+  <%- include('../partials/head', { title: 'Kom i gang' }) %>
 </head>
 <body>
-  <main style="max-width:420px;">
-    <div class="card">
-      <h1>Opprett admin-bruker</h1>
-      <p class="muted">Dette er første gangs oppsett. Opprett den første admin-kontoen for intern forvaltning.</p>
-      <% if (error) { %><div class="error-message"><%= error %></div><% } %>
+  <main class="auth">
+    <div class="auth-card">
+      <%- include('../partials/brand', { tag: 'Admin' }) %>
+      <h1 class="title">Opprett administrator</h1>
+      <p class="lede">Første gang tjenesten startes, lager du kontoen som skal administrere rom og bookinger.</p>
+
+      <% if (error) { %>
+        <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= error %></span></div>
+      <% } %>
+
       <form method="post" action="/admin/setup">
         <div class="field">
           <label for="username">Brukernavn</label>
-          <input type="text" id="username" name="username" required autofocus />
+          <input class="input" type="text" id="username" name="username" autocomplete="username" required autofocus />
         </div>
         <div class="field">
-          <label for="password">Passord (minst 8 tegn)</label>
-          <input type="password" id="password" name="password" minlength="8" required />
+          <label for="password">Passord <span class="label-hint">(minst 8 tegn)</span></label>
+          <input class="input" type="password" id="password" name="password" minlength="8" autocomplete="new-password" required />
         </div>
         <div class="field">
-          <label for="passwordConfirm">Bekreft passord</label>
-          <input type="password" id="passwordConfirm" name="passwordConfirm" minlength="8" required />
+          <label for="passwordConfirm">Gjenta passord</label>
+          <input class="input" type="password" id="passwordConfirm" name="passwordConfirm" minlength="8" autocomplete="new-password" required />
         </div>
-        <button type="submit" class="button" style="width:100%;">Opprett admin</button>
+        <button type="submit" class="btn btn-primary btn-block">Opprett og logg inn</button>
       </form>
     </div>
   </main>

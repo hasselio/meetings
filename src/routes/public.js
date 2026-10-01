@@ -1,24 +1,26 @@
 const express = require('express');
 const { Rooms, Bookings } = require('../models');
 const { sendBookingConfirmation } = require('../services/mailer');
+const { roomStatus, formatToday, timelineHours, parseRange } = require('../availability');
 const config = require('../config');
 
 const router = express.Router();
 
-function isRoomFreeNow(roomId) {
-  const now = new Date().toISOString();
-  return !Bookings.hasOverlap(roomId, now, now);
-}
-
 router.get('/', (req, res) => {
-  const rooms = Rooms.all().map((r) => ({ ...r, free: isRoomFreeNow(r.id) }));
-  res.render('public/home', { rooms, timezone: config.timezone });
+  const now = new Date();
+  const rooms = Rooms.all().map((r) => ({ ...r, status: roomStatus(r.id, now) }));
+  res.render('public/home', {
+    rooms,
+    freeCount: rooms.filter((r) => r.status.free).length,
+    today: formatToday(now),
+    hours: timelineHours(),
+  });
 });
 
 router.get('/rom/:id', (req, res) => {
   const room = Rooms.get(req.params.id);
   if (!room) return res.status(404).render('public/not-found');
-  res.render('public/room', { room, timezone: config.timezone });
+  res.render('public/room', { room, status: roomStatus(room.id), timezone: config.timezone });
 });
 
 // Offentlig API: kun ledig/opptatt, ingen detaljer om hvem som har booket
@@ -26,16 +28,15 @@ router.get('/api/rooms/:id/events', (req, res) => {
   const room = Rooms.get(req.params.id);
   if (!room) return res.status(404).json({ error: 'Rom ikke funnet' });
 
-  const { start, end } = req.query;
-  if (!start || !end) return res.status(400).json({ error: 'start og end er påkrevd' });
+  const range = parseRange(req.query);
+  if (!range) return res.status(400).json({ error: 'Gyldig start og end er påkrevd' });
 
-  const bookings = Bookings.forRoomBetween(room.id, start, end);
+  const bookings = Bookings.forRoomBetween(room.id, range.start, range.end);
   const events = bookings.map((b) => ({
     start: b.start_time,
     end: b.end_time,
     title: 'Opptatt',
-    display: 'block',
-    color: '#94a3b8',
+    classNames: ['ev-busy'],
   }));
   res.json(events);
 });

@@ -1,73 +1,118 @@
 <!DOCTYPE html>
 <html lang="nb">
 <head>
-  <%- include('../partials/head', { title: room.name + ' – Møteromsbooking' }) %>
+  <%- include('../partials/head', { title: room.name, calendar: true, description: 'Se når ' + room.name + ' er ledig og book direkte.' }) %>
 </head>
-<body data-room-id="<%= room.id %>" data-timezone="<%= timezone %>">
-  <header class="site-header">
-    <a href="/">Møteromsbooking</a>
-    <nav><a href="/admin">Admin</a></nav>
-  </header>
-  <main>
-    <p><a href="/">&larr; Alle rom</a></p>
-    <div class="flex-between">
-      <div>
-        <h1 style="margin-bottom:0.2rem;"><%= room.name %></h1>
-        <p class="muted" style="margin-top:0;">
-          <%= room.location || '' %><%= room.capacity ? ' · ' + room.capacity + ' personer' : '' %>
-        </p>
-      </div>
-      <button class="button" id="bookBtn">Book møte</button>
-    </div>
-    <% if (room.description) { %><p><%= room.description %></p><% } %>
+<body>
+  <%- include('../partials/public-header') %>
 
-    <div id="calendar"></div>
+  <main id="innhold" class="container">
+    <a class="back-link" href="/"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %>Alle rom</a>
+
+    <div class="page-head">
+      <div>
+        <h1 class="title"><%= room.name %></h1>
+        <div class="room-intro">
+          <span class="status status-pill <%= status.free ? 'status-free' : 'status-busy' %>">
+            <span class="status-dot"></span><%= status.detail %>
+          </span>
+          <% if (room.location) { %>
+            <span class="meta-item"><%- include('../partials/icon', { name: 'pin', size: 15 }) %><%= room.location %></span>
+          <% } %>
+          <% if (room.capacity) { %>
+            <span class="meta-item"><%- include('../partials/icon', { name: 'users', size: 15 }) %><%= room.capacity %> plasser</span>
+          <% } %>
+        </div>
+        <% if (room.description) { %><p class="room-description"><%= room.description %></p><% } %>
+      </div>
+    </div>
+
+    <div class="room-layout">
+      <section class="calendar-card" aria-label="Kalender for <%= room.name %>">
+        <div id="calendar" data-room-id="<%= room.id %>"></div>
+        <div class="calendar-legend">
+          <span><span class="legend-swatch legend-busy"></span>Opptatt</span>
+          <span><span class="legend-swatch legend-selection"></span>Ditt valg</span>
+          <span>Dra over en ledig tid i kalenderen for å velge den.</span>
+        </div>
+      </section>
+
+      <aside class="panel" id="booking" aria-labelledby="booking-title">
+        <div id="bookingFormView">
+          <h2 class="panel-title" id="booking-title">Book rommet</h2>
+          <p class="panel-sub">Velg tid her eller direkte i kalenderen.</p>
+
+          <form class="panel-form" id="bookingForm" novalidate>
+            <div id="formAlert" role="alert"></div>
+
+            <div class="field-row field-row-3">
+              <div class="field">
+                <label for="date">Dato</label>
+                <input class="input" type="date" id="date" name="date" required />
+              </div>
+              <div class="field">
+                <label for="startTime">Fra</label>
+                <input class="input" type="time" id="startTime" name="startTime" step="900" required />
+              </div>
+              <div class="field">
+                <label for="endTime">Til</label>
+                <input class="input" type="time" id="endTime" name="endTime" step="900" required aria-describedby="timeError" />
+              </div>
+            </div>
+            <p class="field-error field-error-row" id="timeError"></p>
+
+            <div class="chips" role="group" aria-label="Varighet">
+              <button type="button" class="chip" data-minutes="30" aria-pressed="false">30 min</button>
+              <button type="button" class="chip" data-minutes="60" aria-pressed="false">1 t</button>
+              <button type="button" class="chip" data-minutes="90" aria-pressed="false">1,5 t</button>
+              <button type="button" class="chip" data-minutes="120" aria-pressed="false">2 t</button>
+            </div>
+
+            <div class="field">
+              <label for="title">Hva er møtet?</label>
+              <input class="input" type="text" id="title" name="title" maxlength="120" placeholder="F.eks. Prosjektmøte" required aria-describedby="titleError" />
+              <p class="field-error" id="titleError"></p>
+            </div>
+            <div class="field">
+              <label for="organizerName">Navn</label>
+              <input class="input" type="text" id="organizerName" name="organizerName" maxlength="80" autocomplete="name" required aria-describedby="organizerNameError" />
+              <p class="field-error" id="organizerNameError"></p>
+            </div>
+            <div class="field">
+              <label for="organizerEmail">E-post</label>
+              <input class="input" type="email" id="organizerEmail" name="organizerEmail" autocomplete="email" inputmode="email" required aria-describedby="organizerEmailError" />
+              <p class="field-error" id="organizerEmailError"></p>
+            </div>
+            <div class="field">
+              <label for="notes">Notat <span class="label-hint">(valgfritt)</span></label>
+              <textarea class="input" id="notes" name="notes" rows="2" maxlength="500"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Book møte</button>
+            <p class="panel-note">
+              Du får en kalenderinvitasjon på e-post. Navnet og e-posten din vises bare for administratorer, ikke for andre som ser kalenderen.
+            </p>
+          </form>
+        </div>
+
+        <div id="bookingSuccessView" hidden>
+          <div class="success">
+            <span class="success-icon"><%- include('../partials/icon', { name: 'check', size: 20 }) %></span>
+            <h2 class="panel-title" tabindex="-1" id="successTitle">Møtet er booket</h2>
+            <p class="panel-sub" id="successMail"></p>
+            <dl class="summary">
+              <div><dt>Rom</dt><dd><%= room.name %></dd></div>
+              <div><dt>Når</dt><dd class="tabular" id="successWhen"></dd></div>
+              <div><dt>Møte</dt><dd id="successTitleText"></dd></div>
+            </dl>
+            <button type="button" class="btn btn-secondary btn-block" id="newBookingBtn">Book en ny tid</button>
+          </div>
+        </div>
+      </aside>
+    </div>
   </main>
 
-  <div class="modal-backdrop" id="bookingModal">
-    <div class="modal">
-      <h2>Book <%= room.name %></h2>
-      <div id="formError"></div>
-      <form id="bookingForm">
-        <div class="field">
-          <label for="title">Møtetittel</label>
-          <input type="text" id="title" name="title" required maxlength="120" />
-        </div>
-        <div class="row">
-          <div class="field">
-            <label for="organizerName">Ditt navn</label>
-            <input type="text" id="organizerName" name="organizerName" required maxlength="80" />
-          </div>
-          <div class="field">
-            <label for="organizerEmail">Din e-post</label>
-            <input type="email" id="organizerEmail" name="organizerEmail" required />
-          </div>
-        </div>
-        <div class="row">
-          <div class="field">
-            <label for="start">Start</label>
-            <input type="datetime-local" id="start" name="start" required />
-          </div>
-          <div class="field">
-            <label for="end">Slutt</label>
-            <input type="datetime-local" id="end" name="end" required />
-          </div>
-        </div>
-        <div class="field">
-          <label for="notes">Notat (valgfritt)</label>
-          <textarea id="notes" name="notes" rows="2"></textarea>
-        </div>
-        <p class="muted" style="font-size:0.85rem;">
-          Du får en møtebekreftelse med kalenderinvitasjon på e-post.
-        </p>
-        <div class="modal-actions">
-          <button type="button" class="button secondary" id="cancelBtn">Avbryt</button>
-          <button type="submit" class="button">Book møte</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <script src="/js/booking.js"></script>
+  <script src="/js/ui.js" defer></script>
+  <script src="/js/booking.js" defer></script>
 </body>
 </html>

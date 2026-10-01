@@ -1,43 +1,60 @@
 <!DOCTYPE html>
 <html lang="nb">
 <head>
-  <meta charset="UTF-8" />
-  <title><%= room ? 'Rediger rom' : 'Nytt rom' %> – Møteromsbooking</title>
-  <link rel="stylesheet" href="/css/style.css" />
+  <%- include('../partials/head', { title: room && room.id ? 'Rediger rom' : 'Nytt rom' }) %>
 </head>
 <body>
-  <header class="site-header">
-    <a href="/admin">Møteromsbooking – Admin</a>
-  </header>
-  <main style="max-width:520px;">
-    <div class="card">
-      <h1><%= room ? 'Rediger rom' : 'Nytt rom' %></h1>
-      <% if (error) { %><div class="error-message"><%= error %></div><% } %>
-      <form method="post" action="<%= room && room.id ? '/admin/rooms/' + room.id : '/admin/rooms' %>">
-        <div class="field">
-          <label for="name">Navn</label>
-          <input type="text" id="name" name="name" required value="<%= room ? room.name : '' %>" />
-        </div>
-        <div class="field">
-          <label for="location">Sted / etasje</label>
-          <input type="text" id="location" name="location" value="<%= room && room.location ? room.location : '' %>" />
-        </div>
-        <div class="field">
-          <label for="capacity">Kapasitet (antall personer)</label>
-          <input type="number" id="capacity" name="capacity" min="1" value="<%= room && room.capacity ? room.capacity : '' %>" />
-        </div>
-        <div class="field">
-          <label for="description">Beskrivelse</label>
-          <textarea id="description" name="description" rows="3"><%= room && room.description ? room.description : '' %></textarea>
-        </div>
-        <div class="field">
-          <label for="color">Farge i kalender</label>
-          <input type="color" id="color" name="color" value="<%= room && room.color ? room.color : '#2563eb' %>" />
-        </div>
-        <button type="submit" class="button">Lagre</button>
-        <a class="button secondary" href="/admin">Avbryt</a>
-      </form>
+  <%- include('../partials/admin-header') %>
+
+  <main id="innhold" class="container">
+    <a class="back-link" href="/admin<%= room && room.id ? '?rom=' + room.id : '' %>"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %>Tilbake</a>
+
+    <div class="page-head">
+      <h1 class="title"><%= room && room.id ? 'Rediger rom' : 'Nytt rom' %></h1>
     </div>
+
+    <form class="form-card" method="post" action="<%= room && room.id ? '/admin/rooms/' + room.id : '/admin/rooms' %>">
+      <% if (error) { %>
+        <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= error %></span></div>
+      <% } %>
+
+      <div class="field">
+        <label for="name">Navn</label>
+        <input class="input" type="text" id="name" name="name" maxlength="80" required value="<%= room ? room.name : '' %>" placeholder="F.eks. Fjordrommet" />
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="location">Plassering <span class="label-hint">(valgfritt)</span></label>
+          <input class="input" type="text" id="location" name="location" maxlength="80" value="<%= room && room.location ? room.location : '' %>" placeholder="F.eks. 3. etasje" />
+        </div>
+        <div class="field">
+          <label for="capacity">Plasser <span class="label-hint">(valgfritt)</span></label>
+          <input class="input" type="number" id="capacity" name="capacity" min="1" max="500" inputmode="numeric" value="<%= room && room.capacity ? room.capacity : '' %>" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="description">Beskrivelse <span class="label-hint">(vises for alle som booker)</span></label>
+        <textarea class="input" id="description" name="description" rows="3" maxlength="400" placeholder="Utstyr, tilgang, praktisk info"><%= room && room.description ? room.description : '' %></textarea>
+      </div>
+      <fieldset class="fieldset">
+        <legend class="label">Farge i adminkalenderen</legend>
+        <div class="swatches">
+          <% const current = room && room.color ? room.color : colors[0];
+             const options = colors.includes(current) ? colors : [current].concat(colors); %>
+          <% options.forEach(function (c) { %>
+            <label class="swatch" title="<%= c %>">
+              <input type="radio" name="color" value="<%= c %>" <%= c === current ? 'checked' : '' %> aria-label="Farge <%= c %>" />
+              <span style="--c: <%= c %>"></span>
+            </label>
+          <% }) %>
+        </div>
+      </fieldset>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Lagre rom</button>
+        <a class="btn btn-ghost" href="/admin<%= room && room.id ? '?rom=' + room.id : '' %>">Avbryt</a>
+      </div>
+    </form>
   </main>
 </body>
 </html>

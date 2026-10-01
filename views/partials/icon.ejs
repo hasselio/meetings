@@ -1,0 +1,19 @@
+<%
+  const paths = {
+    'arrow-left': '<path d="M19 12H5"/><path d="m11 18-6-6 6-6"/>',
+    'arrow-right': '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
+    pin: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/>',
+    users: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.9-5 5.5-5s4.9 2 5.5 5"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M17.5 14.2c1.6.6 2.7 2.3 3 4.8"/>',
+    calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+    x: '<path d="M6 6l12 12M18 6 6 18"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    pencil: '<path d="m14.5 5.5 4 4L8 20H4v-4Z"/>',
+    trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7"/><path d="m6.5 7 .8 12.2a1.5 1.5 0 0 0 1.5 1.3h6.4a1.5 1.5 0 0 0 1.5-1.3L17.5 7"/>',
+    logout: '<path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14"/><path d="m10 8-4 4 4 4M6 12h9"/>',
+    external: '<path d="M14 4.5h5.5V10M19.5 4.5 11 13"/><path d="M17 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7H10"/>',
+    alert: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V13M12 16.4v.1"/>',
+    door: '<path d="M5 20.5h14M7 20.5V4.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16"/><path d="M13.5 12.5v.1"/>',
+  };
+  const s = typeof size !== 'undefined' ? size : 16;
+%><svg width="<%= s %>" height="<%= s %>" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><%- paths[name] %></svg>

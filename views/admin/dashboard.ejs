@@ -1,66 +1,89 @@
 <!DOCTYPE html>
 <html lang="nb">
 <head>
-  <%- include('../partials/head', { title: 'Admin – Møteromsbooking' }) %>
+  <%- include('../partials/head', { title: 'Bookinger', calendar: Boolean(activeRoom) }) %>
 </head>
-<body data-timezone="<%= timezone %>">
-  <header class="site-header">
-    <a href="/admin">Møteromsbooking – Admin</a>
-    <nav>
-      <a href="/">Offentlig side</a>
-      <form method="post" action="/admin/logout" style="display:inline;">
-        <button type="submit" style="background:none;border:none;color:white;opacity:0.9;cursor:pointer;font-size:1rem;">Logg ut</button>
-      </form>
-    </nav>
-  </header>
-  <main>
-    <div class="flex-between">
-      <h1>Rom og bookinger</h1>
-      <a class="button" href="/admin/rooms/new">+ Nytt rom</a>
+<body>
+  <%- include('../partials/admin-header') %>
+
+  <main id="innhold" class="container">
+    <div class="page-head">
+      <div>
+        <h1 class="title">Bookinger</h1>
+        <p class="lede">Klikk på et møte for å se hvem som har booket, eller avlyse det.</p>
+      </div>
+      <a class="btn btn-secondary" href="/admin/rooms/new"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a>
     </div>
 
-    <% if (rooms.length === 0) { %>
-      <div class="card">Ingen rom er lagt til ennå. Klikk "Nytt rom" for å komme i gang.</div>
+    <% if (!activeRoom) { %>
+      <section class="board">
+        <div class="empty-state">
+          <span class="empty-icon"><%- include('../partials/icon', { name: 'door', size: 22 }) %></span>
+          <h2>Legg til det første rommet</h2>
+          <p>Når et rom er lagt inn, vises det på den offentlige siden og kan bookes av hvem som helst med lenken.</p>
+          <a class="btn btn-primary" href="/admin/rooms/new"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a>
+        </div>
+      </section>
     <% } else { %>
-      <div class="room-list-admin">
-        <% rooms.forEach(function(room, i) { %>
-          <a href="#" class="tab room-tab <%= i === 0 ? 'active' : '' %>" data-room-id="<%= room.id %>" data-room-color="<%= room.color %>">
-            <%= room.name %>
-          </a>
-        <% }) %>
+      <div class="toolbar">
+        <nav class="segmented" aria-label="Velg rom">
+          <% rooms.forEach(function (room) { %>
+            <a href="/admin?rom=<%= room.id %>" class="room-tab" aria-current="<%= room.id === activeRoom.id ? 'true' : 'false' %>">
+              <span class="room-color" style="--c: <%= room.color %>"></span><%= room.name %>
+            </a>
+          <% }) %>
+        </nav>
       </div>
 
-      <div class="card flex-between" id="roomActions">
-        <div id="roomMeta" class="muted"></div>
-        <div>
-          <a class="button secondary" id="editRoomLink" href="#">Rediger rom</a>
-          <form id="deleteRoomForm" method="post" style="display:inline;" onsubmit="return confirm('Slette dette rommet? Dette fjerner også alle bookinger for rommet.');">
-            <button type="submit" class="button danger">Slett rom</button>
+      <div class="room-bar">
+        <div class="room-bar-meta">
+          <% if (activeRoom.location) { %>
+            <span class="meta-item"><%- include('../partials/icon', { name: 'pin', size: 15 }) %><%= activeRoom.location %></span>
+          <% } %>
+          <% if (activeRoom.capacity) { %>
+            <span class="meta-item"><%- include('../partials/icon', { name: 'users', size: 15 }) %><%= activeRoom.capacity %> plasser</span>
+          <% } %>
+          <a class="meta-item" href="/rom/<%= activeRoom.id %>" target="_blank" rel="noopener">
+            Offentlig side <%- include('../partials/icon', { name: 'external', size: 14 }) %>
+          </a>
+        </div>
+        <div class="room-bar-actions">
+          <a class="btn btn-secondary btn-sm" href="/admin/rooms/<%= activeRoom.id %>/edit"><%- include('../partials/icon', { name: 'pencil', size: 14 }) %>Rediger</a>
+          <form method="post" action="/admin/rooms/<%= activeRoom.id %>/delete">
+            <button type="submit" class="btn btn-danger btn-sm" data-confirm data-confirm-label="Slett rom og bookinger">
+              <%- include('../partials/icon', { name: 'trash', size: 14 }) %>Slett
+            </button>
           </form>
         </div>
       </div>
 
-      <div id="calendar"></div>
+      <section class="calendar-card" aria-label="Kalender for <%= activeRoom.name %>">
+        <div id="calendar" data-room-id="<%= activeRoom.id %>" data-room-color="<%= activeRoom.color %>"></div>
+      </section>
     <% } %>
   </main>
 
-  <div class="modal-backdrop" id="detailsModal">
-    <div class="modal">
-      <h2 id="detailsTitle"></h2>
-      <p><strong>Booket av:</strong> <span id="detailsOrganizer"></span></p>
-      <p><strong>E-post:</strong> <span id="detailsEmail"></span></p>
-      <p><strong>Tid:</strong> <span id="detailsTime"></span></p>
-      <p id="detailsNotesWrap"><strong>Notat:</strong> <span id="detailsNotes"></span></p>
-      <div class="modal-actions">
-        <button type="button" class="button secondary" id="closeDetailsBtn">Lukk</button>
-        <button type="button" class="button danger" id="cancelBookingBtn">Avlys møte</button>
-      </div>
+  <div class="overlay" id="overlay"></div>
+  <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+    <div class="drawer-head">
+      <h2 class="drawer-title" id="drawerTitle"></h2>
+      <button type="button" class="btn btn-ghost btn-icon" id="drawerClose" aria-label="Lukk"><%- include('../partials/icon', { name: 'x', size: 18 }) %></button>
     </div>
-  </div>
+    <div class="drawer-body">
+      <dl class="details">
+        <div><dt>Tid</dt><dd class="tabular" id="dWhen"></dd></div>
+        <div><dt>Rom</dt><dd id="dRoom"></dd></div>
+        <div><dt>Booket av</dt><dd id="dName"></dd></div>
+        <div><dt>E-post</dt><dd><a id="dEmail"></a></dd></div>
+        <div id="dNotesWrap"><dt>Notat</dt><dd id="dNotes"></dd></div>
+      </dl>
+    </div>
+    <div class="drawer-foot">
+      <button type="button" class="btn btn-danger" id="cancelBookingBtn" data-confirm-label="Bekreft avlysning">Avlys møte</button>
+    </div>
+  </aside>
 
-  <script>
-    window.ROOMS = <%- roomsJson %>;
-  </script>
-  <script src="/js/admin-calendar.js"></script>
+  <script src="/js/ui.js" defer></script>
+  <% if (activeRoom) { %><script src="/js/admin-calendar.js" defer></script><% } %>
 </body>
 </html>

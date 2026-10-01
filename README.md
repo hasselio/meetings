@@ -27,7 +27,8 @@ Bygget med Node.js + Express + SQLite (better-sqlite3) — ingen ekstern databas
    - `COOKIE_SECURE` – sett til `true` når tjenesten står bak en TLS-terminerende reverse proxy (se under), slik at innloggingscookien kun sendes over HTTPS.
    - `SMTP_*` og `MAIL_FROM_*` – SMTP-konto som skal sende møtebekreftelser (f.eks. et delt e-postalias, eller en transaksjonsepost-tjeneste). Uten SMTP satt opp vil bookinger fortsatt fungere, men det sendes ingen bekreftelse.
    - `BASE_URL` – URL-en tjenesten nås på (brukes ikke direkte i e-post ennå, men bør stemme for fremtidig bruk).
-   - `TIMEZONE` – standard `Europe/Oslo`.
+   - `TIMEZONE` – standard `Europe/Oslo`. Brukes for «ledig til / opptatt til» og dagens tidslinje på forsiden.
+   - `APP_NAME` – navnet som vises i toppen og i fanen (standard `Møterom`).
 
 4. Start tjenesten:
 
@@ -96,7 +97,9 @@ All data ligger i `data/mettings.db` (SQLite). Denne filen er ikke sjekket inn i
 - Sesjoner lagres i minne — en omstart av tjenesten logger ut admin (uproblematisk for et internt verktøy, men kan byttes til en filbasert sesjonslagring senere om ønskelig).
 - E-postbekreftelse sendes som en ekte kalenderinvitasjon (`METHOD:REQUEST`), slik at booker kan trykke "Godta" og få møtet inn i sin egen kalender. Avlysning sendes som `METHOD:CANCEL`.
 - Overlappende bookinger på samme rom avvises på serversiden.
-- Frontend bruker [FullCalendar](https://fullcalendar.io/), som er selv-hostet under `public/vendor/fullcalendar/` — ingen internettilgang er nødvendig for at kalendervisningen skal fungere når tjenesten kjører.
+- Frontend bruker [FullCalendar](https://fullcalendar.io/) (med norsk lokalisering) og fonten [Geist](https://vercel.com/font), begge selv-hostet under `public/vendor/` — ingen internettilgang er nødvendig når tjenesten kjører.
+- Grensesnittet følger systemets lys/mørk-modus og respekterer «redusert bevegelse».
+- Kalender og bookingskjema viser tider i besøkerens lokale tidssone; kalenderinvitasjonen sendes i UTC, så den havner riktig i mottakerens kalender uansett hvor de befinner seg.
 
 ## Videre arbeid (forslag)
 

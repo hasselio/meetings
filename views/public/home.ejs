@@ -1,35 +1,85 @@
 <!DOCTYPE html>
 <html lang="nb">
 <head>
-  <%- include('../partials/head', { title: 'Møterom – ledig/opptatt' }) %>
+  <%- include('../partials/head', { title: 'Ledige rom' }) %>
 </head>
 <body>
-  <header class="site-header">
-    <a href="/">Møteromsbooking</a>
-    <nav><a href="/admin">Admin</a></nav>
-  </header>
-  <main>
-    <h1>Møterom</h1>
-    <p class="muted">Velg et rom for å se tilgjengelighet og booke et møte.</p>
+  <%- include('../partials/public-header') %>
+
+  <main id="innhold" class="container">
+    <div class="page-head">
+      <div>
+        <p class="eyebrow"><%= today.charAt(0).toUpperCase() + today.slice(1) %></p>
+        <h1 class="display">Finn et ledig rom</h1>
+        <p class="lede">
+          <% if (rooms.length === 0) { %>
+            Det er ikke lagt inn noen møterom ennå.
+          <% } else if (freeCount === rooms.length) { %>
+            Alle <%= rooms.length %> rom er ledige akkurat nå. Velg et rom for å se uka og booke.
+          <% } else { %>
+            <%= freeCount %> av <%= rooms.length %> rom er ledige akkurat nå. Velg et rom for å se uka og booke.
+          <% } %>
+        </p>
+      </div>
+    </div>
 
     <% if (rooms.length === 0) { %>
-      <div class="card">Ingen rom er lagt til ennå. Logg inn som admin for å legge til rom.</div>
-    <% } %>
+      <section class="board">
+        <div class="empty-state">
+          <span class="empty-icon"><%- include('../partials/icon', { name: 'door', size: 22 }) %></span>
+          <h2>Ingen rom å vise</h2>
+          <p>Når rom er lagt inn av en administrator, ser du dem her sammen med dagens ledige tider.</p>
+        </div>
+      </section>
+    <% } else { %>
+      <section class="board" aria-label="Møterom">
+        <div class="board-head" aria-hidden="true">
+          <span>Rom</span>
+          <span>I dag</span>
+          <span>Status</span>
+          <span></span>
+        </div>
+        <% rooms.forEach(function (room, i) { const s = room.status; %>
+          <a class="room-row" href="/rom/<%= room.id %>" style="--i: <%= i %>">
+            <div class="room-row-info">
+              <div class="room-row-name"><%= room.name %></div>
+              <div class="room-row-meta">
+                <% if (room.location) { %>
+                  <span class="meta-item"><%- include('../partials/icon', { name: 'pin', size: 14 }) %><%= room.location %></span>
+                <% } %>
+                <% if (room.capacity) { %>
+                  <span class="meta-item"><%- include('../partials/icon', { name: 'users', size: 14 }) %><%= room.capacity %> plasser</span>
+                <% } %>
+              </div>
+            </div>
 
-    <div class="room-grid">
-      <% rooms.forEach(function(room) { %>
-        <a class="card room-card" href="/rom/<%= room.id %>" style="text-decoration:none; color:inherit;">
-          <h3><%= room.name %></h3>
-          <div class="meta">
-            <%= room.location || '' %><%= room.capacity ? ' · ' + room.capacity + ' personer' : '' %>
-          </div>
-          <span class="status-pill <%= room.free ? 'free' : 'busy' %>">
-            <span class="dot"></span>
-            <%= room.free ? 'Ledig nå' : 'Opptatt nå' %>
-          </span>
-        </a>
-      <% }) %>
-    </div>
+            <div class="timeline" aria-hidden="true">
+              <div class="timeline-track">
+                <div class="timeline-past" style="width: <%= s.nowPercent.toFixed(2) %>%"></div>
+                <% s.segments.forEach(function (seg) { %>
+                  <div class="timeline-busy" style="left: <%= seg.left.toFixed(2) %>%; width: <%= seg.width.toFixed(2) %>%"></div>
+                <% }) %>
+                <% if (s.nowPercent > 0 && s.nowPercent < 100) { %>
+                  <div class="timeline-now" style="left: <%= s.nowPercent.toFixed(2) %>%"></div>
+                <% } %>
+              </div>
+              <div class="timeline-scale tabular">
+                <% hours.forEach(function (h) { %><span><%= h %></span><% }) %>
+              </div>
+            </div>
+
+            <div class="room-row-status">
+              <span class="status <%= s.free ? 'status-free' : 'status-busy' %>">
+                <span class="status-dot"></span><%= s.free ? 'Ledig nå' : 'Opptatt nå' %>
+              </span>
+              <span class="status-detail tabular"><%= s.detail %></span>
+            </div>
+
+            <span class="room-row-arrow"><%- include('../partials/icon', { name: 'arrow-right', size: 18 }) %></span>
+          </a>
+        <% }) %>
+      </section>
+    <% } %>
   </main>
 </body>
 </html>

@@ -1,0 +1,5 @@
+<a class="brand" href="<%= typeof href !== 'undefined' ? href : '/' %>">
+  <span class="brand-mark"><%- include('icon', { name: 'calendar', size: 16 }) %></span>
+  <span class="brand-name"><%= appName %></span>
+  <% if (typeof tag !== 'undefined') { %><span class="brand-tag"><%= tag %></span><% } %>
+</a>
