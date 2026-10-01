@@ -6,16 +6,18 @@ if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 16) {
   );
 }
 
+const isTruthy = (value) => (value || '').trim().toLowerCase() === 'true';
+
 module.exports = {
   port: parseInt(process.env.PORT || '3000', 10),
   baseUrl: process.env.BASE_URL || 'http://localhost:3000',
   timezone: process.env.TIMEZONE || 'Europe/Oslo',
   sessionSecret: process.env.SESSION_SECRET,
-  cookieSecure: process.env.COOKIE_SECURE === 'true',
+  cookieSecure: isTruthy(process.env.COOKIE_SECURE),
   smtp: {
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true',
+    secure: isTruthy(process.env.SMTP_SECURE),
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
