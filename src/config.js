@@ -1,10 +1,17 @@
 require('dotenv').config();
 
+if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 16) {
+  throw new Error(
+    'SESSION_SECRET må settes til en lang, tilfeldig streng (minst 16 tegn) i .env før tjenesten kan starte.'
+  );
+}
+
 module.exports = {
   port: parseInt(process.env.PORT || '3000', 10),
   baseUrl: process.env.BASE_URL || 'http://localhost:3000',
   timezone: process.env.TIMEZONE || 'Europe/Oslo',
-  sessionSecret: process.env.SESSION_SECRET || 'utviklings-secret-ikke-bruk-i-produksjon',
+  sessionSecret: process.env.SESSION_SECRET,
+  cookieSecure: process.env.COOKIE_SECURE === 'true',
   smtp: {
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || '587', 10),

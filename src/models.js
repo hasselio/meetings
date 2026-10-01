@@ -94,6 +94,9 @@ const AdminUsers = {
   findByUsername(username) {
     return db.prepare('SELECT * FROM admin_users WHERE username = ?').get(username);
   },
+  findById(id) {
+    return db.prepare('SELECT * FROM admin_users WHERE id = ?').get(id);
+  },
   create({ username, passwordHash }) {
     const info = db
       .prepare('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)')

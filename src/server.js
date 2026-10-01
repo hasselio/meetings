@@ -16,12 +16,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+if (config.cookieSecure) {
+  app.set('trust proxy', 1); // nødvendig for secure-cookies bak en TLS-terminerende reverse proxy
+}
+
 app.use(
   session({
     secret: config.sessionSecret,
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 * 12 }, // 12 timer
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 12, // 12 timer
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: config.cookieSecure,
+    },
   })
 );
 

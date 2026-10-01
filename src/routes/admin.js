@@ -27,8 +27,11 @@ router.post('/setup', (req, res) => {
   }
   const passwordHash = bcrypt.hashSync(password, 12);
   const user = AdminUsers.create({ username, passwordHash });
-  req.session.adminId = user.id;
-  res.redirect('/admin');
+  req.session.regenerate((err) => {
+    if (err) return res.status(500).send('Kunne ikke opprette sesjon');
+    req.session.adminId = user.id;
+    res.redirect('/admin');
+  });
 });
 
 // --- Innlogging ---
@@ -43,8 +46,11 @@ router.post('/login', (req, res) => {
   if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
     return res.render('admin/login', { error: 'Feil brukernavn eller passord' });
   }
-  req.session.adminId = user.id;
-  res.redirect('/admin');
+  req.session.regenerate((err) => {
+    if (err) return res.status(500).send('Kunne ikke opprette sesjon');
+    req.session.adminId = user.id;
+    res.redirect('/admin');
+  });
 });
 
 router.post('/logout', (req, res) => {
@@ -56,7 +62,10 @@ router.use(requireAdmin);
 
 router.get('/', (req, res) => {
   const rooms = Rooms.all();
-  res.render('admin/dashboard', { rooms, timezone: config.timezone });
+  // Hindrer at </script> i rom-felt (navn, beskrivelse osv.) bryter ut av det
+  // innebygde script-elementet i dashboard.ejs.
+  const roomsJson = JSON.stringify(rooms).replace(/</g, '\\u003c');
+  res.render('admin/dashboard', { rooms, roomsJson, timezone: config.timezone });
 });
 
 // Rom-administrasjon

@@ -23,7 +23,8 @@ Bygget med Node.js + Express + SQLite (better-sqlite3) — ingen ekstern databas
    ```
 
    Viktigst:
-   - `SESSION_SECRET` – sett til en lang, tilfeldig streng.
+   - `SESSION_SECRET` – **påkrevd**, tjenesten starter ikke uten den. Generer en tilfeldig verdi med f.eks. `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`.
+   - `COOKIE_SECURE` – sett til `true` når tjenesten står bak en TLS-terminerende reverse proxy (se under), slik at innloggingscookien kun sendes over HTTPS.
    - `SMTP_*` og `MAIL_FROM_*` – SMTP-konto som skal sende møtebekreftelser (f.eks. et delt e-postalias, eller en transaksjonsepost-tjeneste). Uten SMTP satt opp vil bookinger fortsatt fungere, men det sendes ingen bekreftelse.
    - `BASE_URL` – URL-en tjenesten nås på (brukes ikke direkte i e-post ennå, men bør stemme for fremtidig bruk).
    - `TIMEZONE` – standard `Europe/Oslo`.
