@@ -29,7 +29,7 @@ test('romansvarlig kan endre rom, men ikke tilgangsstyring eller logg', async ()
   createAdmin('ansvar', 'manager');
   const agent = await login('ansvar');
 
-  const created = await agent.post('/admin/rom').type('form').send({ name: 'Styrerommet' });
+  const created = await agent.post('/admin/rom').type('form').send({ name: 'Styrerommet', open_days: ['1', '2'] });
   assert.equal(created.status, 302);
   assert.equal((await agent.get('/admin/tilgang')).status, 403);
   assert.equal((await agent.get('/admin/administratorer/1')).status, 403);

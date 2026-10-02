@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Sperrede perioder' }) %>
+</head>
+<body>
+  <%- include('../partials/admin-header') %>
+
+  <main id="innhold" class="container">
+    <%- include('../partials/rooms-tabs', { current: 'blocks' }) %>
+    <div class="page-head">
+      <div>
+        <h1 class="title">Sperrede perioder</h1>
+        <p class="lede">Steng et rom for booking i en periode, for eksempel ved oppussing eller arrangementer. Besøkende ser bare at rommet ikke er tilgjengelig.</p>
+      </div>
+    </div>
+
+    <% if (flash) { %>
+      <div class="alert <%= flash.type === 'error' ? 'alert-error' : 'alert-success' %>" role="status">
+        <%- include('../partials/icon', { name: flash.type === 'error' ? 'alert' : 'check', size: 16 }) %><span><%= flash.text %></span>
+      </div>
+    <% } %>
+
+    <% if (can('rooms.manage')) { %>
+      <form class="form-card form-card-wide" method="post" action="/admin/sperringer">
+        <h2 class="form-section-title">Ny sperring</h2>
+        <% if (error) { %>
+          <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= error %></span></div>
+        <% } %>
+        <% if (conflicts && conflicts.length) { %>
+          <ul class="conflict-list">
+            <% conflicts.forEach(function (c) { %>
+              <li><span class="tabular"><%= c.when %></span> · <%= c.room_name %> · <%= c.title %> (<%= c.organizer_name %>)</li>
+            <% }) %>
+          </ul>
+        <% } %>
+        <div class="field">
+          <label for="room">Rom</label>
+          <select class="input" id="room" name="room" required>
+            <% rooms.forEach(function (r) { %>
+              <option value="<%= r.id %>" <%= String(values.room) === String(r.id) ? 'selected' : '' %>><%= r.name %></option>
+            <% }) %>
+            <option value="alle" <%= values.room === 'alle' ? 'selected' : '' %>>Alle rom</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="start">Fra</label>
+            <input class="input" type="datetime-local" id="start" name="start" step="900" value="<%= values.start || '' %>" required />
+          </div>
+          <div class="field">
+            <label for="end">Til</label>
+            <input class="input" type="datetime-local" id="end" name="end" step="900" value="<%= values.end || '' %>" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="reason">Årsak <span class="label-hint">(vises bare for administratorer)</span></label>
+          <input class="input" type="text" id="reason" name="reason" maxlength="120" value="<%= values.reason || '' %>" placeholder="F.eks. Maling av vegger" />
+        </div>
+        <label class="check">
+          <input type="checkbox" name="cancelConflicts" value="1" <%= values.cancelConflicts ? 'checked' : '' %> />
+          <span>Avlys bookinger som ligger i perioden, og gi beskjed til de som har booket</span>
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Sperr perioden</button>
+        </div>
+      </form>
+    <% } %>
+
+    <section class="section" aria-labelledby="blocks-title">
+      <h2 class="section-title" id="blocks-title">Kommende og pågående sperringer <span class="count"><%= blocks.length %></span></h2>
+      <% if (!blocks.length) { %>
+        <p class="muted">Ingen rom er sperret.</p>
+      <% } else { %>
+        <ul class="request-list">
+          <% blocks.forEach(function (b) { %>
+            <li class="request request-compact">
+              <div class="request-main">
+                <div class="request-name"><%= b.room_name %></div>
+                <div class="request-meta">
+                  <span class="tabular"><%= b.when %></span>
+                  <% if (b.reason) { %><span><%= b.reason %></span><% } %>
+                  <% if (b.created_by_username) { %><span class="muted">av <%= b.created_by_username %></span><% } %>
+                </div>
+              </div>
+              <% if (can('rooms.manage')) { %>
+                <form method="post" action="/admin/sperringer/<%= b.id %>/slett">
+                  <button type="submit" class="btn btn-secondary btn-sm" data-confirm data-confirm-label="Bekreft fjerning">Fjern sperring</button>
+                </form>
+              <% } %>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+  </main>
+
+  <script src="/js/ui.js" defer></script>
+</body>
+</html>

@@ -45,6 +45,7 @@
       info.el.style.setProperty('--c', info.event.extendedProps.color);
     },
     eventContent(arg) {
+      if (arg.event.extendedProps.blocked) return { domNodes: [document.createTextNode(arg.event.title)] };
       if (arg.view.type === 'listWeek') {
         const wrap = document.createElement('span');
         const strong = document.createElement('strong');
@@ -64,6 +65,10 @@
     },
     eventClick(info) {
       info.jsEvent.preventDefault();
+      if (info.event.extendedProps.blocked) {
+        window.location.href = '/admin/sperringer';
+        return;
+      }
       openDrawer(info.event);
     },
   });

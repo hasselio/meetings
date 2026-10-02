@@ -10,6 +10,22 @@ const ACTIVE_B = ACTIVE.replace(/status|expires_at/g, (c) => `b.${c}`);
 
 const withFacilities = (row) => row && { ...row, facilities: Facilities.parse(row.facilities) };
 
+// Regler som ikke er oppgitt, får standardverdiene fra databasen.
+const roomParams = (r) => ({
+  name: r.name,
+  location: r.location || null,
+  capacity: r.capacity || null,
+  description: r.description || null,
+  color: r.color || '#2563eb',
+  facilities: JSON.stringify(Facilities.normalize(r.facilities)),
+  open_from: r.open_from || '07:00',
+  open_to: r.open_to || '20:00',
+  open_days: r.open_days ?? '1,2,3,4,5,6,0',
+  max_duration_minutes: r.max_duration_minutes || null,
+  max_days_ahead: r.max_days_ahead || null,
+  buffer_minutes: r.buffer_minutes || 0,
+});
+
 const Rooms = {
   all() {
     return db.prepare('SELECT * FROM rooms ORDER BY name COLLATE NOCASE').all().map(withFacilities);
@@ -27,33 +43,24 @@ const Rooms = {
   get(id) {
     return withFacilities(db.prepare('SELECT * FROM rooms WHERE id = ?').get(id));
   },
-  create({ name, location, capacity, description, color, facilities }) {
+  create(input) {
     const info = db
       .prepare(
-        'INSERT INTO rooms (name, location, capacity, description, color, facilities) VALUES (?, ?, ?, ?, ?, ?)'
+        `INSERT INTO rooms (name, location, capacity, description, color, facilities,
+           open_from, open_to, open_days, max_duration_minutes, max_days_ahead, buffer_minutes)
+         VALUES (@name, @location, @capacity, @description, @color, @facilities,
+           @open_from, @open_to, @open_days, @max_duration_minutes, @max_days_ahead, @buffer_minutes)`
       )
-      .run(
-        name,
-        location || null,
-        capacity || null,
-        description || null,
-        color || '#2563eb',
-        JSON.stringify(Facilities.normalize(facilities))
-      );
+      .run(roomParams(input));
     return this.get(info.lastInsertRowid);
   },
-  update(id, { name, location, capacity, description, color, facilities }) {
+  update(id, input) {
     db.prepare(
-      'UPDATE rooms SET name = ?, location = ?, capacity = ?, description = ?, color = ?, facilities = ? WHERE id = ?'
-    ).run(
-      name,
-      location || null,
-      capacity || null,
-      description || null,
-      color || '#2563eb',
-      JSON.stringify(Facilities.normalize(facilities)),
-      id
-    );
+      `UPDATE rooms SET name = @name, location = @location, capacity = @capacity, description = @description,
+         color = @color, facilities = @facilities, open_from = @open_from, open_to = @open_to, open_days = @open_days,
+         max_duration_minutes = @max_duration_minutes, max_days_ahead = @max_days_ahead, buffer_minutes = @buffer_minutes
+       WHERE id = @id`
+    ).run({ ...roomParams({ ...this.get(id), ...input }), id });
     return this.get(id);
   },
   delete(id) {

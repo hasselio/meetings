@@ -1,5 +1,5 @@
 const express = require('express');
-const { Rooms, Bookings } = require('../models');
+const { Rooms, Bookings, RoomBlocks } = require('../models');
 const { currentAdmin } = require('../middleware/auth');
 const { createLimiter } = require('../middleware/rate-limit');
 const { bookingChallengeHandler, verifyBookingCaptcha } = require('../captcha');
@@ -81,7 +81,14 @@ router.get('/api/rooms/:id/events', (req, res) => {
     title: 'Opptatt',
     classNames: ['ev-busy'],
   }));
-  res.json(events);
+  // Årsaken til en sperring kan være intern, så besøkende ser bare at rommet ikke er tilgjengelig.
+  const blocks = RoomBlocks.overlapping(room.id, range.start, range.end).map((k) => ({
+    start: k.start_time,
+    end: k.end_time,
+    title: 'Ikke tilgjengelig',
+    classNames: ['ev-busy', 'ev-blocked'],
+  }));
+  res.json(events.concat(blocks));
 });
 
 router.post('/api/rooms/:id/bookings', verifyBookingCaptcha, async (req, res) => {

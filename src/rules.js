@@ -74,4 +74,42 @@ function violation(room, start, end, now = new Date()) {
   return null;
 }
 
-module.exports = { rulesOf, describe, describeDays, violation, formatDuration, DAY_NAMES, DAY_SHORT, WEEK_ORDER };
+const DURATION_OPTIONS = [30, 60, 90, 120, 180, 240, 480];
+const BUFFER_OPTIONS = [0, 5, 10, 15, 30];
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$|^24:00$/;
+
+// Leser reglene fra romskjemaet. Returnerer { values, error } med kolonnenavn som i databasen.
+function fromForm(body) {
+  const days = [].concat(body.open_days || []).map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+  const openFrom = HHMM.test(body.open_from || '') ? body.open_from : '07:00';
+  const openTo = HHMM.test(body.open_to || '') ? body.open_to : '20:00';
+  const maxDuration = parseInt(body.max_duration_minutes, 10);
+  const maxDays = parseInt(body.max_days_ahead, 10);
+  const buffer = parseInt(body.buffer_minutes, 10);
+  const values = {
+    open_from: openFrom,
+    open_to: openTo,
+    open_days: [...new Set(days)].sort().join(','),
+    max_duration_minutes: DURATION_OPTIONS.includes(maxDuration) ? maxDuration : null,
+    max_days_ahead: maxDays > 0 ? Math.min(maxDays, 730) : null,
+    buffer_minutes: BUFFER_OPTIONS.includes(buffer) ? buffer : 0,
+  };
+  let error = null;
+  if (!days.length) error = 'Velg minst én dag rommet kan bookes.';
+  else if (time.parseHHMM(openFrom) >= time.parseHHMM(openTo)) error = 'Åpningstiden må slutte etter at den starter.';
+  return { values, error };
+}
+
+module.exports = {
+  rulesOf,
+  describe,
+  describeDays,
+  violation,
+  fromForm,
+  formatDuration,
+  DURATION_OPTIONS,
+  BUFFER_OPTIONS,
+  DAY_NAMES,
+  DAY_SHORT,
+  WEEK_ORDER,
+};

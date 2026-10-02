@@ -7,6 +7,7 @@
   <%- include('../partials/admin-header') %>
 
   <main id="innhold" class="container">
+    <%- include('../partials/rooms-tabs', { current: 'rooms' }) %>
     <div class="page-head">
       <div>
         <h1 class="title">Rom</h1>
@@ -44,6 +45,9 @@
                 <span class="meta-item"><%- include('../partials/icon', { name: 'users', size: 14 }) %><%= room.capacity ? room.capacity + ' plasser' : 'Ingen kapasitet satt' %></span>
                 <a class="meta-item" href="/admin?rom=<%= room.id %>"><%- include('../partials/icon', { name: 'calendar', size: 14 }) %><%= room.upcoming === 0 ? 'Ingen kommende bookinger' : room.upcoming + (room.upcoming === 1 ? ' kommende booking' : ' kommende bookinger') %></a>
               </div>
+              <ul class="room-rules room-rules-admin" aria-label="Regler for booking">
+                <% room.rules.forEach(function (rule) { %><li><%= rule %></li><% }) %>
+              </ul>
               <% if (room.facilityList.length) { %>
                 <ul class="facility-chips" aria-label="Fasiliteter">
                   <% room.facilityList.forEach(function (f) { %>

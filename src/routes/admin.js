@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { Rooms, Bookings, AdminUsers, AdminRequests } = require('../models');
+const { Rooms, Bookings, RoomBlocks, AdminUsers, AdminRequests } = require('../models');
 const {
   sendCancellation,
   notifyNewAccessRequest,
@@ -16,6 +16,8 @@ const { parseRange } = require('../availability');
 const { ROLES, isRole, can, roleLabel, requirePermission } = require('../roles');
 const audit = require('../audit');
 const Facilities = require('../facilities');
+const Rules = require('../rules');
+const time = require('../time');
 const config = require('../config');
 
 const router = express.Router();
@@ -146,7 +148,7 @@ router.use((req, res, next) => {
     ? 'access'
     : /^\/(konto|nytt-passord)/.test(req.path)
       ? 'account'
-      : req.path.startsWith('/rom')
+      : req.path.startsWith('/rom') || req.path.startsWith('/sperringer')
         ? 'rooms'
         : req.path.startsWith('/logg') || req.path.startsWith('/personvern')
           ? 'audit'
@@ -164,20 +166,34 @@ const ROOM_COLORS = ['#3f5bd9', '#2f7d6d', '#c2562b', '#a1428a', '#7a6a2c', '#5b
 function roomInput(body) {
   const color = /^#[0-9a-f]{6}$/i.test(body.color || '') ? body.color : ROOM_COLORS[0];
   const capacity = parseInt(body.capacity, 10);
+  const rules = Rules.fromForm(body);
   return {
-    name: (body.name || '').trim(),
-    location: (body.location || '').trim(),
-    description: (body.description || '').trim(),
-    capacity: capacity > 0 ? capacity : null,
-    color,
-    facilities: Facilities.normalize(body.facilities),
+    input: {
+      name: (body.name || '').trim().slice(0, 80),
+      location: (body.location || '').trim().slice(0, 80),
+      description: (body.description || '').trim().slice(0, 400),
+      capacity: capacity > 0 ? Math.min(capacity, 500) : null,
+      color,
+      facilities: Facilities.normalize(body.facilities),
+      ...rules.values,
+    },
+    error: !(body.name || '').trim() ? 'Gi rommet et navn.' : rules.error,
   };
 }
 
 function renderRoomForm(res, room, error) {
-  res
-    .status(error ? 400 : 200)
-    .render('admin/room-form', { room, error, colors: ROOM_COLORS, facilityOptions: Facilities.FACILITIES });
+  res.status(error ? 400 : 200).render('admin/room-form', {
+    room,
+    error,
+    colors: ROOM_COLORS,
+    facilityOptions: Facilities.FACILITIES,
+    rules: Rules.rulesOf(room || {}),
+    durationOptions: Rules.DURATION_OPTIONS,
+    bufferOptions: Rules.BUFFER_OPTIONS,
+    dayNames: Rules.DAY_NAMES,
+    weekOrder: Rules.WEEK_ORDER,
+    formatDuration: Rules.formatDuration,
+  });
 }
 
 router.get('/', (req, res) => {
@@ -191,6 +207,7 @@ router.get('/rom', (req, res) => {
   const rooms = Rooms.allWithUpcoming(new Date().toISOString()).map((r) => ({
     ...r,
     facilityList: Facilities.describe(r.facilities),
+    rules: Rules.describe(r),
   }));
   res.render('admin/rooms', { rooms });
 });
@@ -204,8 +221,8 @@ router.get('/rom/ny', manageRooms, (req, res) => {
 });
 
 router.post('/rom', manageRooms, (req, res) => {
-  const input = roomInput(req.body);
-  if (!input.name) return renderRoomForm(res, input, 'Gi rommet et navn.');
+  const { input, error } = roomInput(req.body);
+  if (error) return renderRoomForm(res, input, error);
   const room = Rooms.create(input);
   audit.byAdmin(req, 'room.created', `La til rommet «${room.name}»`, { type: 'room', id: room.id });
   req.session.flash = { type: 'success', text: `«${room.name}» er lagt til og kan bookes.` };
@@ -221,8 +238,8 @@ router.get('/rom/:id/rediger', manageRooms, (req, res) => {
 router.post('/rom/:id', manageRooms, (req, res) => {
   const room = Rooms.get(req.params.id);
   if (!room) return res.status(404).render('public/not-found');
-  const input = roomInput(req.body);
-  if (!input.name) return renderRoomForm(res, { ...input, id: room.id }, 'Gi rommet et navn.');
+  const { input, error } = roomInput(req.body);
+  if (error) return renderRoomForm(res, { ...input, id: room.id }, error);
   Rooms.update(room.id, input);
   audit.byAdmin(req, 'room.updated', `Endret rommet «${input.name}»`, { type: 'room', id: room.id });
   req.session.flash = { type: 'success', text: `Endringene i «${input.name}» er lagret.` };
@@ -261,6 +278,109 @@ router.post('/rom/:id/slett', manageRooms, async (req, res) => {
   res.redirect('/admin/rom');
 });
 
+// --- Sperrede perioder (oppussing, arrangementer o.l.) ---
+function renderBlocks(res, { values = {}, error = null, conflicts = null, status = 200 } = {}) {
+  const blocks = RoomBlocks.upcoming(new Date().toISOString()).map((b) => ({
+    ...b,
+    when: blockRange(b.start_time, b.end_time),
+  }));
+  res.status(status).render('admin/blocks', { blocks, rooms: Rooms.all(), values, error, conflicts });
+}
+
+// «mandag 6. april 08:00 – fredag 10. april 16:00», eller kortere når det er samme dag.
+function blockRange(start, end) {
+  const sameDay = time.localDateKey(start) === time.localDateKey(new Date(new Date(end).getTime() - 1));
+  return sameDay
+    ? time.formatRange(start, end)
+    : `${time.formatDay(start)} ${time.formatTime(start)} – ${time.formatDay(end)} ${time.formatTime(end)}`;
+}
+
+const parseLocalDateTime = (value) => {
+  const [date, clock] = String(value || '').split('T');
+  return time.fromLocal(date, (clock || '').slice(0, 5));
+};
+
+router.get('/sperringer', (req, res) => renderBlocks(res));
+
+router.post('/sperringer', manageRooms, async (req, res) => {
+  const values = {
+    room: req.body.room,
+    start: req.body.start,
+    end: req.body.end,
+    reason: String(req.body.reason || '').trim().slice(0, 120),
+    cancelConflicts: Boolean(req.body.cancelConflicts),
+  };
+  const fail = (error, conflicts = null) => renderBlocks(res, { values, error, conflicts, status: 400 });
+
+  const rooms = values.room === 'alle' ? Rooms.all() : [Rooms.get(values.room)].filter(Boolean);
+  if (!rooms.length) return fail('Velg rom.');
+  const start = parseLocalDateTime(values.start);
+  const end = parseLocalDateTime(values.end);
+  if (!start || !end) return fail('Velg når sperringen starter og slutter.');
+  if (end <= start) return fail('Sperringen må slutte etter at den starter.');
+  if (end <= new Date()) return fail('Perioden har allerede passert.');
+
+  const startIso = start.toISOString();
+  const endIso = end.toISOString();
+  const conflicts = rooms.flatMap((room) =>
+    Bookings.overlapping(room.id, startIso, endIso).map((b) => ({
+      ...b,
+      room_name: room.name,
+      when: time.formatRange(b.start_time, b.end_time),
+    }))
+  );
+  if (conflicts.length && !values.cancelConflicts) {
+    return fail(
+      `${conflicts.length} booking(er) ligger i perioden. Kryss av for å avlyse dem, eller velg en annen periode.`,
+      conflicts
+    );
+  }
+
+  for (const room of rooms) {
+    const block = RoomBlocks.create({ roomId: room.id, start: startIso, end: endIso, reason: values.reason, createdBy: req.admin.id });
+    audit.byAdmin(
+      req,
+      'room.blocked',
+      `Sperret ${room.name} ${blockRange(startIso, endIso)}${values.reason ? ` (${values.reason})` : ''}`,
+      { type: 'block', id: block.id }
+    );
+  }
+
+  let notified = 0;
+  for (const booking of conflicts) {
+    const result = await BookingService.cancel([booking], {
+      actor: { type: 'admin', req },
+      wholeSeries: false,
+      reason: `Rommet er ikke tilgjengelig i perioden${values.reason ? `: ${values.reason}` : ''}.`,
+    });
+    if (result.mailSent || booking.status === 'pending') notified++;
+  }
+
+  let text = rooms.length > 1 ? `Alle ${rooms.length} rom er sperret.` : `${rooms[0].name} er sperret.`;
+  if (conflicts.length) {
+    text +=
+      notified === conflicts.length
+        ? ` ${conflicts.length} booking(er) er avlyst, og de som booket har fått beskjed.`
+        : ` ${conflicts.length} booking(er) er avlyst, men ${conflicts.length - notified} fikk ikke e-post. Gi beskjed manuelt.`;
+  }
+  req.session.flash = { type: 'success', text };
+  res.redirect('/admin/sperringer');
+});
+
+router.post('/sperringer/:id/slett', manageRooms, (req, res) => {
+  const block = RoomBlocks.get(Number(req.params.id));
+  if (block) {
+    const room = Rooms.get(block.room_id);
+    RoomBlocks.delete(block.id);
+    audit.byAdmin(req, 'room.unblocked', `Fjernet sperringen av ${room.name} ${blockRange(block.start_time, block.end_time)}`, {
+      type: 'block',
+      id: block.id,
+    });
+    req.session.flash = { type: 'success', text: `Sperringen er fjernet, og ${room.name} kan bookes igjen i perioden.` };
+  }
+  res.redirect('/admin/sperringer');
+});
+
 // Bookinger med fulle detaljer (kun admin)
 router.get('/api/rooms/:id/events', (req, res) => {
   const room = Rooms.get(req.params.id);
@@ -286,7 +406,16 @@ router.get('/api/rooms/:id/events', (req, res) => {
       notes: b.notes,
     },
   }));
-  res.json(events);
+  const blocks = RoomBlocks.overlapping(room.id, range.start, range.end).map((k) => ({
+    id: `sperring-${k.id}`,
+    start: k.start_time,
+    end: k.end_time,
+    title: k.reason ? `Sperret: ${k.reason}` : 'Sperret',
+    classNames: ['ev-blocked'],
+    editable: false,
+    extendedProps: { blocked: true },
+  }));
+  res.json(events.concat(blocks));
 });
 
 router.get('/api/bookings/:id', (req, res) => {
@@ -584,7 +713,6 @@ router.get('/logg', requirePermission('audit.view'), (req, res) => {
 });
 
 // --- Innsyn og sletting av personopplysninger (én e-postadresse) ---
-const time = require('../time');
 
 function renderPrivacy(res, { email = '', bookings = null, done = null, error = null, status = 200 } = {}) {
   const nowIso = new Date().toISOString();

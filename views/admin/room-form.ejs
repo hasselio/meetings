@@ -61,6 +61,55 @@
       </fieldset></div>
 
       <div class="form-section"><fieldset class="fieldset">
+        <legend class="form-section-title">Regler for booking</legend>
+        <p class="form-section-note">Gjelder for alle som booker via nettsiden. Administratorer kan overstyre reglene når de booker på vegne av andre.</p>
+        <fieldset class="fieldset">
+          <legend class="label">Dager</legend>
+          <div class="day-picker">
+            <% weekOrder.forEach(function (d) { %>
+              <label class="day-option">
+                <input type="checkbox" name="open_days" value="<%= d %>" <%= rules.openDays.includes(d) ? 'checked' : '' %> />
+                <span><%= dayNames[d].slice(0, 3) %></span>
+              </label>
+            <% }) %>
+          </div>
+        </fieldset>
+        <div class="field-row">
+          <div class="field">
+            <label for="open_from">Fra</label>
+            <input class="input" type="time" id="open_from" name="open_from" step="900" value="<%= rules.openFrom %>" required />
+          </div>
+          <div class="field">
+            <label for="open_to">Til</label>
+            <input class="input" type="time" id="open_to" name="open_to" step="900" value="<%= rules.openTo %>" required />
+          </div>
+        </div>
+        <div class="field-row field-row-thirds">
+          <div class="field">
+            <label for="max_duration_minutes">Maks varighet</label>
+            <select class="input" id="max_duration_minutes" name="max_duration_minutes">
+              <option value="">Ingen grense</option>
+              <% durationOptions.forEach(function (m) { %>
+                <option value="<%= m %>" <%= rules.maxDurationMinutes === m ? 'selected' : '' %>><%= formatDuration(m) %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="max_days_ahead">Dager frem i tid</label>
+            <input class="input" type="number" id="max_days_ahead" name="max_days_ahead" min="1" max="730" inputmode="numeric" placeholder="Ingen grense" value="<%= rules.maxDaysAhead || '' %>" />
+          </div>
+          <div class="field">
+            <label for="buffer_minutes">Pause mellom møter</label>
+            <select class="input" id="buffer_minutes" name="buffer_minutes">
+              <% bufferOptions.forEach(function (m) { %>
+                <option value="<%= m %>" <%= rules.bufferMinutes === m ? 'selected' : '' %>><%= m ? m + ' min' : 'Ingen' %></option>
+              <% }) %>
+            </select>
+          </div>
+        </div>
+      </fieldset></div>
+
+      <div class="form-section"><fieldset class="fieldset">
         <legend class="form-section-title">Farge i adminkalenderen</legend>
         <div class="swatches">
           <% const current = room && room.color ? room.color : colors[0];

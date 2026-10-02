@@ -2704,3 +2704,88 @@ body > main {
   );
   border-left-style: dashed;
 }
+
+/* ---------- Regler og sperringer ---------- */
+
+.field-row-thirds {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 640px) {
+  .field-row-thirds {
+    grid-template-columns: 1fr;
+  }
+}
+
+.day-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 14px;
+}
+
+.day-option {
+  position: relative;
+  cursor: pointer;
+}
+
+.day-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.day-option span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 48px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: capitalize;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.day-option input:checked + span {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--ink-fg);
+}
+
+.day-option input:focus-visible + span {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.room-rules-admin {
+  margin: 6px 0 0;
+}
+
+.conflict-list {
+  margin: 0 0 16px;
+  padding: 10px 14px 10px 30px;
+  border-radius: var(--r-md);
+  background: var(--busy-bg);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.fc .fc-event.ev-blocked {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--surface-2) 0 6px,
+    color-mix(in srgb, var(--text) 8%, var(--surface-2)) 6px 12px
+  );
+  border: 0;
+  border-left: 3px solid var(--text-3);
+  cursor: default;
+}
+
+.fc .fc-event.ev-blocked .fc-event-main {
+  color: var(--text-2);
+}
