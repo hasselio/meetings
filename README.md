@@ -3,7 +3,11 @@
 Enkel møterom-booking-tjeneste for hosting på f.eks. en Raspberry Pi.
 
 - **Offentlig grensesnitt** (`/`): eksterne og interne kan se ledig/opptatt per møterom i en kalender, og booke et møte. Booker får en møtebekreftelse på e-post med kalenderinvitasjon (.ics).
-- **Admin-grensesnitt** (`/admin`): innlogget administrasjon av rom, og full oversikt over bookinger (hvem, e-post, tittel, notat) med mulighet til å avlyse et møte (sender avlysning på e-post).
+- **Admin-grensesnitt** (`/admin`) med tre faner:
+  - **Bookinger:** kalender per rom med full oversikt (hvem, e-post, tittel, notat) og mulighet til å avlyse et møte (sender avlysning på e-post).
+  - **Rom:** legg til, rediger og slett rom, med plassering, kapasitet, beskrivelse og fasiliteter (skjerm, Teams-oppsett, tavle, kaffeautomat osv.). Fasilitetene vises med ikon for de som booker. Sletter du et rom med kommende bookinger, får de som booket avlysning på e-post.
+  - **Tilgang:** godkjenn eller avslå nye administratorer.
+- **Se som besøkende:** fra menyen, romlisten og redigeringsskjemaet kan en admin åpne den offentlige siden. En smal linje øverst viser at du er i forhåndsvisning, med lenker tilbake til redigering. Innholdet er nøyaktig det besøkende ser.
 
 Bygget med Node.js + Express + SQLite (better-sqlite3) — ingen ekstern database eller build-steg nødvendig, passer godt på en Raspberry Pi.
 

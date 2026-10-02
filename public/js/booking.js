@@ -47,10 +47,21 @@
     chips.forEach((chip) => chip.setAttribute('aria-pressed', String(Number(chip.dataset.minutes) === minutes)));
   }
 
+  const DAY_START = 7 * 60;
+  const DAY_END = 19 * 60;
+  const minutesOf = (d) => d.getHours() * 60 + d.getMinutes();
+  const withinDay = (start, end) =>
+    start.toDateString() === end.toDateString() && minutesOf(start) >= DAY_START && minutesOf(end) <= DAY_END;
+
+  // Neste hele eller halve time fra nå; utenfor 07–19 blir det neste dag kl. 08.
   function defaultRange() {
     const start = new Date();
     start.setSeconds(0, 0);
     start.setMinutes(start.getMinutes() < 30 ? 30 : 60);
+    if (!withinDay(start, new Date(start.getTime() + 60 * 60000))) {
+      if (minutesOf(start) >= DAY_START) start.setDate(start.getDate() + 1);
+      start.setHours(8, 0, 0, 0);
+    }
     return { start, end: new Date(start.getTime() + 60 * 60000) };
   }
 
@@ -63,7 +74,7 @@
     let start = defaultRange().start;
     while (start < limit) {
       const end = new Date(start.getTime() + 60 * 60000);
-      const outside = start.getHours() < 7 || end.getHours() > 19 || (end.getHours() === 19 && end.getMinutes() > 0);
+      const outside = !withinDay(start, end);
       const busy = events.some((e) => e.start < end && e.end > start);
       if (!outside && !busy) return { start, end };
       start = new Date(start.getTime() + step);

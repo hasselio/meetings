@@ -1,14 +1,25 @@
 const express = require('express');
-const { Rooms, Bookings } = require('../models');
+const { Rooms, Bookings, AdminUsers } = require('../models');
 const { sendBookingConfirmation } = require('../services/mailer');
 const { roomStatus, formatToday, timelineHours, parseRange } = require('../availability');
+const Facilities = require('../facilities');
 const config = require('../config');
 
 const router = express.Router();
 
+// Innloggede administratorer får en forhåndsvisningslinje; selve innholdet er det samme som for alle andre.
+router.use((req, res, next) => {
+  res.locals.adminPreview = Boolean(req.session.adminId && AdminUsers.findById(req.session.adminId));
+  next();
+});
+
 router.get('/', (req, res) => {
   const now = new Date();
-  const rooms = Rooms.all().map((r) => ({ ...r, status: roomStatus(r.id, now) }));
+  const rooms = Rooms.all().map((r) => ({
+    ...r,
+    status: roomStatus(r.id, now),
+    facilityList: Facilities.describe(r.facilities),
+  }));
   res.render('public/home', {
     rooms,
     freeCount: rooms.filter((r) => r.status.free).length,
@@ -20,7 +31,12 @@ router.get('/', (req, res) => {
 router.get('/rom/:id', (req, res) => {
   const room = Rooms.get(req.params.id);
   if (!room) return res.status(404).render('public/not-found');
-  res.render('public/room', { room, status: roomStatus(room.id), timezone: config.timezone });
+  res.render('public/room', {
+    room,
+    facilityList: Facilities.describe(room.facilities),
+    status: roomStatus(room.id),
+    timezone: config.timezone,
+  });
 });
 
 // Offentlig API: kun ledig/opptatt, ingen detaljer om hvem som har booket

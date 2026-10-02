@@ -4,12 +4,13 @@
     <%- include('brand', { href: '/admin', tag: 'Admin' }) %>
     <nav class="nav" aria-label="Adminmeny">
       <a class="nav-link" href="/admin" <%- locals.section === 'bookings' ? 'aria-current="page"' : '' %>>Bookinger</a>
+      <a class="nav-link" href="/admin/rom" <%- locals.section === 'rooms' ? 'aria-current="page"' : '' %>>Rom</a>
       <a class="nav-link" href="/admin/tilgang" <%- locals.section === 'access' ? 'aria-current="page"' : '' %>>
         Tilgang<% if (locals.pendingCount) { %> <span class="badge" aria-label="<%= pendingCount %> venter"><%= pendingCount %></span><% } %>
       </a>
       <span class="nav-divider" aria-hidden="true"></span>
-      <a class="nav-link" href="/" target="_blank" rel="noopener" aria-label="Offentlig side (åpnes i ny fane)">
-        <span class="nav-text">Offentlig side</span> <%- include('icon', { name: 'external', size: 14 }) %>
+      <a class="nav-link" href="/" target="_blank" rel="noopener" aria-label="Se som besøkende (åpnes i ny fane)">
+        <span class="nav-text">Se som besøkende</span> <%- include('icon', { name: 'external', size: 14 }) %>
       </a>
       <form method="post" action="/admin/logout">
         <button type="submit" class="nav-link" aria-label="Logg ut">

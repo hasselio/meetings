@@ -1,9 +1,26 @@
 <a class="skip-link" href="#innhold">Hopp til innhold</a>
+<% if (locals.adminPreview) { const previewRoom = typeof room !== 'undefined' && room && room.id ? room : null; %>
+  <div class="preview-bar" role="region" aria-label="Forhåndsvisning for administrator">
+    <div class="container">
+      <span class="preview-bar-text">
+        <%- include('icon', { name: 'monitor', size: 15 }) %>
+        Du ser siden slik besøkende ser den
+      </span>
+      <span class="preview-bar-actions">
+        <% if (previewRoom) { %>
+          <a href="/admin/rom/<%= previewRoom.id %>/rediger"><%- include('icon', { name: 'pencil', size: 14 }) %>Rediger rommet</a>
+          <a href="/admin?rom=<%= previewRoom.id %>"><%- include('icon', { name: 'calendar', size: 14 }) %>Se bookinger</a>
+        <% } %>
+        <a href="/admin/rom"><%- include('icon', { name: 'arrow-left', size: 14 }) %>Tilbake til admin</a>
+      </span>
+    </div>
+  </div>
+<% } %>
 <header class="site-header">
   <div class="container">
     <%- include('brand') %>
     <nav class="nav" aria-label="Hovedmeny">
-      <a class="nav-link" href="/admin">Logg inn</a>
+      <% if (!locals.adminPreview) { %><a class="nav-link" href="/admin">Logg inn</a><% } %>
     </nav>
   </div>
 </header>

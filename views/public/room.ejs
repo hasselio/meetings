@@ -24,6 +24,13 @@
           <% } %>
         </div>
         <% if (room.description) { %><p class="room-description"><%= room.description %></p><% } %>
+        <% if (facilityList.length) { %>
+          <ul class="facility-chips facility-chips-public" aria-label="Fasiliteter">
+            <% facilityList.forEach(function (f) { %>
+              <li class="facility-chip"><%- include('../partials/icon', { name: f.icon, size: 15 }) %><%= f.label %></li>
+            <% }) %>
+          </ul>
+        <% } %>
       </div>
     </div>
 

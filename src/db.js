@@ -17,6 +17,7 @@ db.exec(`
     capacity INTEGER,
     description TEXT,
     color TEXT DEFAULT '#2563eb',
+    facilities TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -60,5 +61,11 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_admin_requests_status ON admin_requests(status, created_at);
 `);
+
+// Databaser opprettet før fasiliteter fantes, får kolonnen lagt til ved oppstart.
+const roomColumns = db.prepare('PRAGMA table_info(rooms)').all().map((c) => c.name);
+if (!roomColumns.includes('facilities')) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN facilities TEXT NOT NULL DEFAULT '[]'`);
+}
 
 module.exports = db;

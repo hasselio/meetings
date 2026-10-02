@@ -51,6 +51,13 @@
                   <span class="meta-item"><%- include('../partials/icon', { name: 'users', size: 14 }) %><%= room.capacity %> plasser</span>
                 <% } %>
               </div>
+              <% if (room.facilityList.length) { %>
+                <span class="facility-icons" role="img" aria-label="Fasiliteter: <%= room.facilityList.map(function (f) { return f.label; }).join(', ') %>">
+                  <% room.facilityList.forEach(function (f) { %>
+                    <span title="<%= f.label %>"><%- include('../partials/icon', { name: f.icon, size: 15 }) %></span>
+                  <% }) %>
+                </span>
+              <% } %>
             </div>
 
             <div class="timeline" aria-hidden="true">

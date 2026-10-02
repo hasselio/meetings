@@ -1321,6 +1321,281 @@ textarea.input {
   font-family: var(--font);
 }
 
+/* ---------- Forhåndsvisning for admin ---------- */
+
+.preview-bar {
+  background: var(--ink);
+  color: var(--ink-fg);
+  font-size: 13px;
+}
+
+.preview-bar .container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  min-height: 40px;
+  padding-block: 6px;
+}
+
+.preview-bar-text,
+.preview-bar-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preview-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.preview-bar-actions a {
+  color: inherit;
+  font-weight: 500;
+  text-decoration: none;
+  opacity: 0.85;
+  transition: opacity 150ms ease;
+}
+
+.preview-bar a:focus-visible {
+  outline-color: var(--ink-fg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .preview-bar-actions a:hover {
+    opacity: 1;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+/* ---------- Rom og fasiliteter ---------- */
+
+.facility-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.facility-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.facility-chips-public {
+  margin-top: 16px;
+}
+
+.facility-chips-public .facility-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.facility-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--text-3);
+}
+
+.room-admin-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.room-admin-name a {
+  text-decoration: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .room-admin-name a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+.room-admin .request-meta {
+  margin-top: 6px;
+}
+
+.room-admin .meta-item {
+  text-decoration: none;
+}
+
+.room-admin-hint {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.room-admin-hint a {
+  color: var(--text-2);
+  text-underline-offset: 3px;
+}
+
+.room-bar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.room-bar-link svg {
+  transition: transform 200ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .room-bar-link:hover {
+    color: var(--text);
+  }
+  .room-bar-link:hover svg {
+    transform: translateX(2px);
+  }
+}
+
+.form-card-wide {
+  max-width: 720px;
+}
+
+.form-section {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
+.form-section-title {
+  margin-bottom: 12px;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.form-section-note {
+  margin: -6px 0 14px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.facility-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.facility-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 160ms var(--ease-out);
+}
+
+.facility-option:active {
+  transform: scale(0.98);
+}
+
+.facility-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.facility-option-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.facility-option-text {
+  display: grid;
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.facility-option-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.facility-option-check {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: transparent;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.facility-option:has(input:checked) {
+  border-color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 4%, var(--surface));
+}
+
+.facility-option:has(input:checked) .facility-option-icon {
+  background: var(--ink);
+  color: var(--ink-fg);
+}
+
+.facility-option:has(input:checked) .facility-option-check {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--ink-fg);
+}
+
+.facility-option:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .facility-option:hover {
+    border-color: var(--text-3);
+  }
+}
+
 /* ---------- Drawer ---------- */
 
 .overlay {

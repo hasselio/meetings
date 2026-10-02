@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Rom' }) %>
+</head>
+<body>
+  <%- include('../partials/admin-header') %>
+
+  <main id="innhold" class="container">
+    <div class="page-head">
+      <div>
+        <h1 class="title">Rom</h1>
+        <p class="lede">Legg til, rediger og fjern møterom. Det du skriver her, ser alle som booker.</p>
+      </div>
+      <a class="btn btn-primary" href="/admin/rom/ny"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a>
+    </div>
+
+    <% if (flash) { %>
+      <div class="alert <%= flash.type === 'error' ? 'alert-error' : 'alert-success' %>" role="status">
+        <%- include('../partials/icon', { name: flash.type === 'error' ? 'alert' : 'check', size: 16 }) %><span><%= flash.text %></span>
+      </div>
+    <% } %>
+
+    <% if (rooms.length === 0) { %>
+      <section class="board">
+        <div class="empty-state">
+          <span class="empty-icon"><%- include('../partials/icon', { name: 'door', size: 22 }) %></span>
+          <h2>Ingen rom ennå</h2>
+          <p>Legg til det første rommet. Det vises på den offentlige siden med en gang, og kan bookes av alle som har lenken.</p>
+          <a class="btn btn-primary" href="/admin/rom/ny"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a>
+        </div>
+      </section>
+    <% } else { %>
+      <ul class="request-list room-admin-list" aria-label="Møterom">
+        <% rooms.forEach(function (room) { %>
+          <li class="request room-admin">
+            <div class="request-main">
+              <div class="room-admin-name">
+                <span class="room-color" style="--c: <%= room.color %>"></span>
+                <a href="/admin/rom/<%= room.id %>/rediger"><%= room.name %></a>
+              </div>
+              <div class="request-meta">
+                <span class="meta-item"><%- include('../partials/icon', { name: 'pin', size: 14 }) %><%= room.location || 'Ingen plassering' %></span>
+                <span class="meta-item"><%- include('../partials/icon', { name: 'users', size: 14 }) %><%= room.capacity ? room.capacity + ' plasser' : 'Ingen kapasitet satt' %></span>
+                <a class="meta-item" href="/admin?rom=<%= room.id %>"><%- include('../partials/icon', { name: 'calendar', size: 14 }) %><%= room.upcoming === 0 ? 'Ingen kommende bookinger' : room.upcoming + (room.upcoming === 1 ? ' kommende booking' : ' kommende bookinger') %></a>
+              </div>
+              <% if (room.facilityList.length) { %>
+                <ul class="facility-chips" aria-label="Fasiliteter">
+                  <% room.facilityList.forEach(function (f) { %>
+                    <li class="facility-chip"><%- include('../partials/icon', { name: f.icon, size: 14 }) %><%= f.label %></li>
+                  <% }) %>
+                </ul>
+              <% } else { %>
+                <p class="room-admin-hint">Ingen fasiliteter registrert. <a href="/admin/rom/<%= room.id %>/rediger">Legg til</a></p>
+              <% } %>
+            </div>
+            <div class="request-actions">
+              <a class="btn btn-ghost btn-sm" href="/rom/<%= room.id %>" target="_blank" rel="noopener" aria-label="Vis <%= room.name %> som besøkende (åpnes i ny fane)"><%- include('../partials/icon', { name: 'external', size: 14 }) %>Vis</a>
+              <a class="btn btn-secondary btn-sm" href="/admin/rom/<%= room.id %>/rediger"><%- include('../partials/icon', { name: 'pencil', size: 14 }) %>Rediger</a>
+              <form method="post" action="/admin/rom/<%= room.id %>/slett">
+                <button type="submit" class="btn btn-danger btn-sm" data-confirm
+                  data-confirm-label="<%= room.upcoming ? 'Slett og avlys ' + room.upcoming : 'Bekreft sletting' %>">
+                  <%- include('../partials/icon', { name: 'trash', size: 14 }) %>Slett
+                </button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </main>
+
+  <script src="/js/ui.js" defer></script>
+</body>
+</html>

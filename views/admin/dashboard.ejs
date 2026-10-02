@@ -12,16 +12,15 @@
         <h1 class="title">Bookinger</h1>
         <p class="lede">Klikk på et møte for å se hvem som har booket, eller avlyse det.</p>
       </div>
-      <a class="btn btn-secondary" href="/admin/rooms/new"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a>
     </div>
 
     <% if (!activeRoom) { %>
       <section class="board">
         <div class="empty-state">
           <span class="empty-icon"><%- include('../partials/icon', { name: 'door', size: 22 }) %></span>
-          <h2>Legg til det første rommet</h2>
-          <p>Når et rom er lagt inn, vises det på den offentlige siden og kan bookes av hvem som helst med lenken.</p>
-          <a class="btn btn-primary" href="/admin/rooms/new"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a>
+          <h2>Ingen rom å vise bookinger for</h2>
+          <p>Legg til rom under «Rom». Når et rom finnes, vises kalenderen med bookingene her.</p>
+          <a class="btn btn-primary" href="/admin/rom/ny"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a>
         </div>
       </section>
     <% } else { %>
@@ -47,14 +46,7 @@
             Offentlig side <%- include('../partials/icon', { name: 'external', size: 14 }) %>
           </a>
         </div>
-        <div class="room-bar-actions">
-          <a class="btn btn-secondary btn-sm" href="/admin/rooms/<%= activeRoom.id %>/edit"><%- include('../partials/icon', { name: 'pencil', size: 14 }) %>Rediger</a>
-          <form method="post" action="/admin/rooms/<%= activeRoom.id %>/delete">
-            <button type="submit" class="btn btn-danger btn-sm" data-confirm data-confirm-label="Slett rom og bookinger">
-              <%- include('../partials/icon', { name: 'trash', size: 14 }) %>Slett
-            </button>
-          </form>
-        </div>
+        <a class="room-bar-link" href="/admin/rom/<%= activeRoom.id %>/rediger">Romdetaljer <%- include('../partials/icon', { name: 'arrow-right', size: 14 }) %></a>
       </div>
 
       <section class="calendar-card" aria-label="Kalender for <%= activeRoom.name %>">

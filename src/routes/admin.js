@@ -6,6 +6,7 @@ const { requireAdmin } = require('../middleware/auth');
 const { createLimiter } = require('../middleware/rate-limit');
 const { challengeHandler, verifyCaptcha } = require('../captcha');
 const { parseRange } = require('../availability');
+const Facilities = require('../facilities');
 const config = require('../config');
 
 const router = express.Router();
@@ -107,7 +108,7 @@ router.use(requireAdmin);
 router.use((req, res, next) => {
   res.locals.adminId = req.session.adminId;
   res.locals.pendingCount = AdminRequests.countPending();
-  res.locals.section = req.path.startsWith('/tilgang') ? 'access' : 'bookings';
+  res.locals.section = req.path.startsWith('/tilgang') ? 'access' : req.path.startsWith('/rom') ? 'rooms' : 'bookings';
   res.locals.flash = req.session.flash || null;
   delete req.session.flash;
   next();
@@ -124,11 +125,14 @@ function roomInput(body) {
     description: (body.description || '').trim(),
     capacity: capacity > 0 ? capacity : null,
     color,
+    facilities: Facilities.normalize(body.facilities),
   };
 }
 
 function renderRoomForm(res, room, error) {
-  res.status(error ? 400 : 200).render('admin/room-form', { room, error, colors: ROOM_COLORS });
+  res
+    .status(error ? 400 : 200)
+    .render('admin/room-form', { room, error, colors: ROOM_COLORS, facilityOptions: Facilities.FACILITIES });
 }
 
 router.get('/', (req, res) => {
@@ -137,34 +141,65 @@ router.get('/', (req, res) => {
   res.render('admin/dashboard', { rooms, activeRoom, timezone: config.timezone });
 });
 
-// Rom-administrasjon
-router.get('/rooms/new', (req, res) => renderRoomForm(res, null, null));
+// --- Rom ---
+router.get('/rom', (req, res) => {
+  const rooms = Rooms.allWithUpcoming(new Date().toISOString()).map((r) => ({
+    ...r,
+    facilityList: Facilities.describe(r.facilities),
+  }));
+  res.render('admin/rooms', { rooms });
+});
 
-router.post('/rooms', (req, res) => {
+router.get('/rom/ny', (req, res) => {
+  const used = new Set(Rooms.all().map((r) => r.color));
+  const color = ROOM_COLORS.find((c) => !used.has(c)) || ROOM_COLORS[0];
+  renderRoomForm(res, { color }, null);
+});
+
+router.post('/rom', (req, res) => {
   const input = roomInput(req.body);
   if (!input.name) return renderRoomForm(res, input, 'Gi rommet et navn.');
   const room = Rooms.create(input);
-  res.redirect(`/admin?rom=${room.id}`);
+  req.session.flash = { type: 'success', text: `«${room.name}» er lagt til og kan bookes.` };
+  res.redirect('/admin/rom');
 });
 
-router.get('/rooms/:id/edit', (req, res) => {
+router.get('/rom/:id/rediger', (req, res) => {
   const room = Rooms.get(req.params.id);
   if (!room) return res.status(404).render('public/not-found');
   renderRoomForm(res, room, null);
 });
 
-router.post('/rooms/:id', (req, res) => {
+router.post('/rom/:id', (req, res) => {
   const room = Rooms.get(req.params.id);
   if (!room) return res.status(404).render('public/not-found');
   const input = roomInput(req.body);
   if (!input.name) return renderRoomForm(res, { ...input, id: room.id }, 'Gi rommet et navn.');
   Rooms.update(room.id, input);
-  res.redirect(`/admin?rom=${room.id}`);
+  req.session.flash = { type: 'success', text: `Endringene i «${input.name}» er lagret.` };
+  res.redirect('/admin/rom');
 });
 
-router.post('/rooms/:id/delete', (req, res) => {
-  Rooms.delete(req.params.id);
-  res.redirect('/admin');
+router.post('/rom/:id/slett', async (req, res) => {
+  const room = Rooms.get(req.params.id);
+  if (!room) return res.status(404).render('public/not-found');
+
+  // Bookingene slettes sammen med rommet, så de som har booket må få avlysning først.
+  const upcoming = Bookings.upcomingForRoom(room.id, new Date().toISOString());
+  Rooms.delete(room.id);
+
+  const results = await Promise.allSettled(upcoming.map((b) => sendBookingCancellation(b, room)));
+  const notified = results.filter((r) => r.status === 'fulfilled' && r.value.sent).length;
+
+  let text = `«${room.name}» er slettet.`;
+  if (upcoming.length) {
+    text +=
+      notified === upcoming.length
+        ? ` ${upcoming.length} kommende booking(er) er avlyst, og de som booket har fått beskjed.`
+        : ` ${upcoming.length} kommende booking(er) er avlyst, men ${upcoming.length - notified} fikk ikke e-post. Gi beskjed manuelt.`;
+  }
+  req.session.flash = { type: 'success', text };
+  res.redirect('/admin/rom');
 });
 
 // Bookinger med fulle detaljer (kun admin)

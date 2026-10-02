@@ -1,24 +1,53 @@
 const crypto = require('crypto');
 const db = require('./db');
+const Facilities = require('./facilities');
+
+const withFacilities = (row) => row && { ...row, facilities: Facilities.parse(row.facilities) };
 
 const Rooms = {
   all() {
-    return db.prepare('SELECT * FROM rooms ORDER BY name').all();
+    return db.prepare('SELECT * FROM rooms ORDER BY name COLLATE NOCASE').all().map(withFacilities);
+  },
+  allWithUpcoming(nowIso) {
+    return db
+      .prepare(
+        `SELECT r.*, (SELECT COUNT(*) FROM bookings b
+                      WHERE b.room_id = r.id AND b.status = 'confirmed' AND b.end_time > ?) AS upcoming
+         FROM rooms r ORDER BY r.name COLLATE NOCASE`
+      )
+      .all(nowIso)
+      .map(withFacilities);
   },
   get(id) {
-    return db.prepare('SELECT * FROM rooms WHERE id = ?').get(id);
+    return withFacilities(db.prepare('SELECT * FROM rooms WHERE id = ?').get(id));
   },
-  create({ name, location, capacity, description, color }) {
-    const stmt = db.prepare(
-      'INSERT INTO rooms (name, location, capacity, description, color) VALUES (?, ?, ?, ?, ?)'
-    );
-    const info = stmt.run(name, location || null, capacity || null, description || null, color || '#2563eb');
+  create({ name, location, capacity, description, color, facilities }) {
+    const info = db
+      .prepare(
+        'INSERT INTO rooms (name, location, capacity, description, color, facilities) VALUES (?, ?, ?, ?, ?, ?)'
+      )
+      .run(
+        name,
+        location || null,
+        capacity || null,
+        description || null,
+        color || '#2563eb',
+        JSON.stringify(Facilities.normalize(facilities))
+      );
     return this.get(info.lastInsertRowid);
   },
-  update(id, { name, location, capacity, description, color }) {
+  update(id, { name, location, capacity, description, color, facilities }) {
     db.prepare(
-      'UPDATE rooms SET name = ?, location = ?, capacity = ?, description = ?, color = ? WHERE id = ?'
-    ).run(name, location || null, capacity || null, description || null, color || '#2563eb', id);
+      'UPDATE rooms SET name = ?, location = ?, capacity = ?, description = ?, color = ?, facilities = ? WHERE id = ?'
+    ).run(
+      name,
+      location || null,
+      capacity || null,
+      description || null,
+      color || '#2563eb',
+      JSON.stringify(Facilities.normalize(facilities)),
+      id
+    );
     return this.get(id);
   },
   delete(id) {
@@ -49,6 +78,11 @@ const Bookings = {
   },
   get(id) {
     return db.prepare('SELECT * FROM bookings WHERE id = ?').get(id);
+  },
+  upcomingForRoom(roomId, nowIso) {
+    return db
+      .prepare(`SELECT * FROM bookings WHERE room_id = ? AND status = 'confirmed' AND end_time > ? ORDER BY start_time`)
+      .all(roomId, nowIso);
   },
   hasOverlap(roomId, start, end, excludeId = null) {
     const row = db

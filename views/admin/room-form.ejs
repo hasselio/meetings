@@ -7,17 +7,21 @@
   <%- include('../partials/admin-header') %>
 
   <main id="innhold" class="container">
-    <a class="back-link" href="/admin<%= room && room.id ? '?rom=' + room.id : '' %>"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %>Tilbake</a>
+    <a class="back-link" href="/admin/rom"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %>Alle rom</a>
 
     <div class="page-head">
-      <h1 class="title"><%= room && room.id ? 'Rediger rom' : 'Nytt rom' %></h1>
+      <h1 class="title"><%= room && room.id ? 'Rediger ' + room.name : 'Nytt rom' %></h1>
+      <% if (room && room.id) { %>
+        <a class="btn btn-secondary" href="/rom/<%= room.id %>" target="_blank" rel="noopener"><%- include('../partials/icon', { name: 'external', size: 15 }) %>Se som besøkende</a>
+      <% } %>
     </div>
 
-    <form class="form-card" method="post" action="<%= room && room.id ? '/admin/rooms/' + room.id : '/admin/rooms' %>">
+    <form class="form-card form-card-wide" method="post" action="<%= room && room.id ? '/admin/rom/' + room.id : '/admin/rom' %>">
       <% if (error) { %>
         <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= error %></span></div>
       <% } %>
 
+      <h2 class="form-section-title">Om rommet</h2>
       <div class="field">
         <label for="name">Navn</label>
         <input class="input" type="text" id="name" name="name" maxlength="80" required value="<%= room ? room.name : '' %>" placeholder="F.eks. Fjordrommet" />
@@ -33,11 +37,31 @@
         </div>
       </div>
       <div class="field">
-        <label for="description">Beskrivelse <span class="label-hint">(vises for alle som booker)</span></label>
-        <textarea class="input" id="description" name="description" rows="3" maxlength="400" placeholder="Utstyr, tilgang, praktisk info"><%= room && room.description ? room.description : '' %></textarea>
+        <label for="description">Beskrivelse <span class="label-hint">(valgfritt, vises for alle som booker)</span></label>
+        <textarea class="input" id="description" name="description" rows="3" maxlength="400" placeholder="Praktisk info, f.eks. hvor nøkkelen henter eller hvordan skjermen slås på"><%= room && room.description ? room.description : '' %></textarea>
       </div>
-      <fieldset class="fieldset">
-        <legend class="label">Farge i adminkalenderen</legend>
+
+      <div class="form-section"><fieldset class="fieldset">
+        <legend class="form-section-title">Fasiliteter</legend>
+        <p class="form-section-note">Vises med ikon på forsiden og romsiden, så de som booker ser hva rommet har.</p>
+        <% const selected = room && room.facilities ? room.facilities : []; %>
+        <div class="facility-grid">
+          <% facilityOptions.forEach(function (f) { %>
+            <label class="facility-option">
+              <input type="checkbox" name="facilities" value="<%= f.key %>" <%= selected.includes(f.key) ? 'checked' : '' %> />
+              <span class="facility-option-icon"><%- include('../partials/icon', { name: f.icon, size: 18 }) %></span>
+              <span class="facility-option-text">
+                <span><%= f.label %></span>
+                <% if (f.hint) { %><span class="facility-option-hint"><%= f.hint %></span><% } %>
+              </span>
+              <span class="facility-option-check"><%- include('../partials/icon', { name: 'check', size: 14 }) %></span>
+            </label>
+          <% }) %>
+        </div>
+      </fieldset></div>
+
+      <div class="form-section"><fieldset class="fieldset">
+        <legend class="form-section-title">Farge i adminkalenderen</legend>
         <div class="swatches">
           <% const current = room && room.color ? room.color : colors[0];
              const options = colors.includes(current) ? colors : [current].concat(colors); %>
@@ -48,11 +72,11 @@
             </label>
           <% }) %>
         </div>
-      </fieldset>
+      </fieldset></div>
 
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Lagre rom</button>
-        <a class="btn btn-ghost" href="/admin<%= room && room.id ? '?rom=' + room.id : '' %>">Avbryt</a>
+        <button type="submit" class="btn btn-primary"><%= room && room.id ? 'Lagre endringer' : 'Legg til rom' %></button>
+        <a class="btn btn-ghost" href="/admin/rom">Avbryt</a>
       </div>
     </form>
   </main>
