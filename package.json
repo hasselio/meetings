@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "create-admin": "node scripts/create-admin.js"
+    "create-admin": "node scripts/create-admin.js",
+    "test": "node --test test/*.test.js"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -22,5 +23,8 @@
     "express-session": "^1.18.0",
     "ics": "^3.7.2",
     "nodemailer": "^10.0.10"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1"
   }
 }
