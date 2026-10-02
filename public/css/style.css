@@ -2513,3 +2513,194 @@ html:has(.preview-dialog[open]) {
     flex-wrap: wrap;
   }
 }
+
+/* ---------- Bunntekst, personvern og «min booking» ---------- */
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Bunnteksten legger seg nederst også på korte sider. Bredden må settes, ellers krymper
+   sentrerte containere til innholdet i en flex-kolonne. */
+body > main {
+  flex: 1 0 auto;
+  width: 100%;
+}
+
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding-block: 20px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.site-footer .container {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.site-footer a {
+  color: var(--text-2);
+}
+
+.container-narrow {
+  max-width: 760px;
+}
+
+.prose {
+  max-width: 65ch;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-2);
+}
+
+.prose h2 {
+  margin: 28px 0 8px;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.prose h2:first-child {
+  margin-top: 0;
+}
+
+.prose p,
+.prose ul {
+  margin: 0 0 12px;
+}
+
+.prose ul {
+  padding-left: 20px;
+}
+
+.prose li + li {
+  margin-top: 4px;
+}
+
+.confirm-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin-bottom: 28px;
+  padding: 20px 22px;
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, var(--border));
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.confirm-card .panel-sub {
+  max-width: 52ch;
+  font-size: 14px;
+}
+
+.confirm-card form {
+  margin: 0;
+}
+
+.manage-item {
+  display: block;
+}
+
+.manage-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+
+.manage-item.is-cancelled .request-name {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.manage-edit {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+}
+
+.manage-edit[hidden] {
+  display: none;
+}
+
+.series-cancel {
+  margin-top: 16px;
+}
+
+.manage-note {
+  margin-top: 28px;
+  max-width: 65ch;
+}
+
+.tag-free {
+  background: var(--free-bg);
+  color: var(--free);
+}
+
+.tag-muted {
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+
+.request-meta .tag {
+  margin-left: 0;
+}
+
+.room-rules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.room-rules li + li::before {
+  content: '·';
+  margin-right: 8px;
+}
+
+.form-card + .section {
+  margin-top: clamp(28px, 4vw, 40px);
+}
+
+.manage-link {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.manage-link p {
+  margin: 0 0 6px;
+}
+
+.manage-link a {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.sub-tabs {
+  width: fit-content;
+  margin-bottom: 24px;
+}
+
+.fc .fc-event.ev-pending {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--c) 10%, var(--surface)) 0 6px,
+    var(--surface) 6px 12px
+  );
+  border-left-style: dashed;
+}

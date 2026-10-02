@@ -60,6 +60,16 @@ function zonedTimeToUtc(year, month, day, hour, minute, tz = TZ) {
 
 const pad = (n) => String(n).padStart(2, '0');
 
+// «2030-03-04» + «10:30» i lokal tid → Date i UTC, eller null ved ugyldig verdi.
+function fromLocal(dateStr, timeStr, tz = TZ) {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr || '');
+  const t = /^(\d{2}):(\d{2})$/.exec(timeStr || '');
+  if (!d || !t) return null;
+  const [y, m, day, h, mi] = [d[1], d[2], d[3], t[1], t[2]].map(Number);
+  if (m < 1 || m > 12 || day < 1 || day > 31 || h > 24 || mi > 59) return null;
+  return zonedTimeToUtc(y, m, day, h, mi, tz);
+}
+
 function localDateKey(date, tz = TZ) {
   const p = localParts(date, tz);
   return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
@@ -103,4 +113,5 @@ module.exports = {
   formatDate,
   formatRange,
   pad,
+  fromLocal,
 };

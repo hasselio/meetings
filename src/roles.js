@@ -21,6 +21,7 @@ const PERMISSIONS = {
   'reports.export': ['admin', 'manager'],
   'access.manage': ['admin'],
   'audit.view': ['admin'],
+  'privacy.manage': ['admin'],
 };
 
 const isRole = (role) => Object.prototype.hasOwnProperty.call(ROLES, role);

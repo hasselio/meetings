@@ -2,6 +2,8 @@
 <html lang="nb">
 <head>
   <%- include('../partials/head', { title: room.name, calendar: true, description: 'Se når ' + room.name + ' er ledig og book direkte.' }) %>
+  <script src="/vendor/altcha/nb.js" defer></script>
+  <script src="/vendor/altcha/altcha.min.js" defer></script>
 </head>
 <body>
   <%- include('../partials/public-header') %>
@@ -24,6 +26,9 @@
           <% } %>
         </div>
         <% if (room.description) { %><p class="room-description"><%= room.description %></p><% } %>
+        <ul class="room-rules" aria-label="Regler for booking">
+          <% rules.forEach(function (rule) { %><li><%= rule %></li><% }) %>
+        </ul>
         <% if (facilityList.length) { %>
           <ul class="facility-chips facility-chips-public" aria-label="Fasiliteter">
             <% facilityList.forEach(function (f) { %>
@@ -36,7 +41,10 @@
 
     <div class="room-layout">
       <section class="calendar-card" aria-label="Kalender for <%= room.name %>">
-        <div id="calendar" data-room-id="<%= room.id %>"></div>
+        <div id="calendar" data-room-id="<%= room.id %>"
+          data-open-from="<%= ruleConfig.openFrom %>" data-open-to="<%= ruleConfig.openTo %>"
+          data-open-days="<%= ruleConfig.openDays.join(',') %>"
+          data-max-minutes="<%= ruleConfig.maxDurationMinutes || '' %>" data-max-days="<%= ruleConfig.maxDaysAhead || '' %>"></div>
         <div class="calendar-legend">
           <span><span class="legend-swatch legend-busy"></span>Opptatt</span>
           <span><span class="legend-swatch legend-selection"></span>Ditt valg</span>
@@ -95,9 +103,26 @@
               <textarea class="input" id="notes" name="notes" rows="2" maxlength="500"></textarea>
             </div>
 
+            <div class="honeypot" aria-hidden="true">
+              <label for="website">Nettside</label>
+              <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" />
+            </div>
+
+            <div class="field captcha">
+              <altcha-widget challenge="/api/altcha" name="altcha" language="nb" auto="onfocus" configuration='{"hideLogo": true}'></altcha-widget>
+              <noscript><p class="field-error">Booking krever JavaScript.</p></noscript>
+            </div>
+
             <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Book møte</button>
             <p class="panel-note">
-              Du får en kalenderinvitasjon på e-post. Navnet og e-posten din vises bare for administratorer, ikke for andre som ser kalenderen.
+              <% if (confirmationRequired) { %>
+                Du får en e-post med en lenke for å bekrefte. Tiden holdes av i <%= holdMinutes %> minutter, og bookingen gjelder når du har bekreftet.
+              <% } else if (mailEnabled) { %>
+                Du får en kalenderinvitasjon på e-post.
+              <% } else { %>
+                Etter bookingen får du en lenke du kan bruke til å endre eller avbestille.
+              <% } %>
+              Navnet og e-posten din vises bare for administratorer, ikke for andre som ser kalenderen. <a href="/personvern">Personvern</a>
             </p>
           </form>
         </div>
@@ -107,6 +132,10 @@
             <span class="success-icon"><%- include('../partials/icon', { name: 'check', size: 20 }) %></span>
             <h2 class="panel-title" tabindex="-1" id="successTitle">Møtet er booket</h2>
             <p class="panel-sub" id="successMail"></p>
+            <div class="manage-link" id="successManage" hidden>
+              <p>Lagre denne lenken. Med den kan du endre eller avbestille senere:</p>
+              <a id="successManageLink" href="#"></a>
+            </div>
             <dl class="summary">
               <div><dt>Rom</dt><dd><%= room.name %></dd></div>
               <div><dt>Når</dt><dd class="tabular" id="successWhen"></dd></div>
@@ -118,6 +147,7 @@
       </aside>
     </div>
   </main>
+  <%- include('../partials/public-footer') %>
 
   <script src="/js/ui.js" defer></script>
   <script src="/js/booking.js" defer></script>

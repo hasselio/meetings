@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Innsyn og sletting' }) %>
+</head>
+<body>
+  <%- include('../partials/admin-header') %>
+
+  <main id="innhold" class="container">
+    <%- include('../partials/audit-tabs', { current: 'privacy' }) %>
+    <div class="page-head">
+      <div>
+        <h1 class="title">Innsyn og sletting</h1>
+        <p class="lede">Når noen ber om innsyn i eller sletting av opplysningene sine, finner du bookingene deres her. Opplysninger slettes uansett automatisk <%= retentionMonths %> måneder etter møtet.</p>
+      </div>
+    </div>
+
+    <% if (done) { %>
+      <div class="alert alert-success" role="status">
+        <%- include('../partials/icon', { name: 'check', size: 16 }) %>
+        <span>Opplysningene er slettet fra <%= done.count %> booking(er).<% if (done.cancelled) { %> <%= done.cancelled %> kommende møte(r) ble avlyst først.<% } %> Rom og tidspunkt er beholdt uten navn.</span>
+      </div>
+    <% } %>
+
+    <form class="form-card form-card-wide" method="post" action="/admin/personvern">
+      <% if (error) { %>
+        <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= error %></span></div>
+      <% } %>
+      <div class="field">
+        <label for="email">E-postadressen personen booket med</label>
+        <input class="input" type="email" id="email" name="email" maxlength="120" value="<%= email %>" required autocomplete="off" />
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Finn bookinger</button>
+      </div>
+    </form>
+
+    <% if (bookings) { %>
+      <section class="section" aria-labelledby="found-title">
+        <h2 class="section-title" id="found-title">Bookinger for <%= email %> <span class="count"><%= bookings.length %></span></h2>
+        <% if (!bookings.length) { %>
+          <p class="muted">Ingen bookinger med personopplysninger er registrert på denne adressen.</p>
+        <% } else { %>
+          <ul class="request-list">
+            <% bookings.forEach(function (b) { %>
+              <li class="request request-compact">
+                <div class="request-main">
+                  <div class="request-name"><%= b.title %></div>
+                  <div class="request-meta">
+                    <span class="tabular"><%= b.when %></span>
+                    <span><%= b.room_name %></span>
+                    <span>Navn: <%= b.organizer_name %></span>
+                    <% if (b.notes) { %><span>Notat: <%= b.notes %></span><% } %>
+                    <span class="tag <%= b.status === 'cancelled' ? 'tag-muted' : b.upcoming ? 'tag-free' : 'tag-muted' %>"><%= b.status === 'cancelled' ? 'Avlyst' : b.upcoming ? 'Kommende' : b.status === 'pending' ? 'Ubekreftet' : 'Gjennomført' %></span>
+                  </div>
+                </div>
+              </li>
+            <% }) %>
+          </ul>
+          <form class="series-cancel" method="post" action="/admin/personvern/slett">
+            <input type="hidden" name="email" value="<%= email %>" />
+            <p class="form-section-note form-section-note-flush">Kommende møter avlyses (personen får beskjed), og navn, e-post, tittel og notat fjernes fra alle bookingene. Dette kan ikke angres.</p>
+            <button type="submit" class="btn btn-danger" data-confirm data-confirm-label="Bekreft sletting">
+              <%- include('../partials/icon', { name: 'trash', size: 15 }) %>Slett opplysningene
+            </button>
+          </form>
+        <% } %>
+      </section>
+    <% } %>
+  </main>
+
+  <script src="/js/ui.js" defer></script>
+</body>
+</html>

@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html lang="nb">
 <head>
-  <%- include('../partials/head', { title: 'Fant ikke siden' }) %>
+  <%- include('../partials/head', { title: 'Fant ikke bookingen' }) %>
+  <meta name="robots" content="noindex" />
 </head>
 <body>
   <%- include('../partials/public-header') %>
   <main id="innhold" class="container">
     <div class="not-found">
       <span class="not-found-code">404</span>
-      <h1 class="title">Vi fant ikke denne siden</h1>
-      <p class="lede">Rommet kan ha blitt fjernet, eller lenken er skrevet feil.</p>
+      <h1 class="title">Vi fant ikke denne bookingen</h1>
+      <p class="lede">Lenken kan være skrevet av feil, eller bookingen er så gammel at opplysningene er slettet.</p>
       <a class="btn btn-primary" href="/"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %>Se alle rom</a>
     </div>
   </main>

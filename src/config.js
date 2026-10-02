@@ -12,8 +12,6 @@ const positiveInt = (value, fallback) => {
   return n > 0 ? n : fallback;
 };
 
-const smtpConfigured = Boolean(process.env.SMTP_HOST);
-
 module.exports = {
   appName: process.env.APP_NAME || 'Møterom',
   port: parseInt(process.env.PORT || '3000', 10),
@@ -34,7 +32,8 @@ module.exports = {
   mailFromEmail: process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER,
   adminNotifyEmail: process.env.ADMIN_NOTIFY_EMAIL || null,
   // Bekreftelse på e-post krever at e-post kan sendes; uten SMTP blir bookinger gyldige med en gang.
-  bookingConfirmation: smtpConfigured && process.env.BOOKING_CONFIRMATION !== 'false',
+  bookingConfirmation: process.env.BOOKING_CONFIRMATION !== 'false',
+  reminders: process.env.REMINDERS !== 'false',
   pendingHoldMinutes: positiveInt(process.env.PENDING_HOLD_MINUTES, 30),
   retentionMonths: positiveInt(process.env.RETENTION_MONTHS, 6),
   auditRetentionMonths: positiveInt(process.env.AUDIT_RETENTION_MONTHS, 12),

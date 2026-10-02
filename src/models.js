@@ -1,6 +1,12 @@
 const crypto = require('crypto');
 const db = require('./db');
 const Facilities = require('./facilities');
+const { manageToken, hashToken } = require('./tokens');
+
+// En booking holder av tiden når den er bekreftet, eller ubekreftet men ikke utløpt ennå.
+const NOW = `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
+const ACTIVE = `(status = 'confirmed' OR (status = 'pending' AND expires_at > ${NOW}))`;
+const ACTIVE_B = ACTIVE.replace(/status|expires_at/g, (c) => `b.${c}`);
 
 const withFacilities = (row) => row && { ...row, facilities: Facilities.parse(row.facilities) };
 
@@ -12,7 +18,7 @@ const Rooms = {
     return db
       .prepare(
         `SELECT r.*, (SELECT COUNT(*) FROM bookings b
-                      WHERE b.room_id = r.id AND b.status = 'confirmed' AND b.end_time > ?) AS upcoming
+                      WHERE b.room_id = r.id AND ${ACTIVE_B} AND b.end_time > ?) AS upcoming
          FROM rooms r ORDER BY r.name COLLATE NOCASE`
       )
       .all(nowIso)
@@ -56,11 +62,12 @@ const Rooms = {
 };
 
 const Bookings = {
+  ACTIVE,
   forRoomBetween(roomId, start, end) {
     return db
       .prepare(
         `SELECT * FROM bookings
-         WHERE room_id = ? AND status = 'confirmed'
+         WHERE room_id = ? AND ${ACTIVE}
            AND start_time < ? AND end_time > ?
          ORDER BY start_time`
       )
@@ -71,7 +78,7 @@ const Bookings = {
       .prepare(
         `SELECT b.*, r.name AS room_name FROM bookings b
          JOIN rooms r ON r.id = b.room_id
-         WHERE b.status = 'confirmed' AND b.start_time < ? AND b.end_time > ?
+         WHERE ${ACTIVE_B} AND b.start_time < ? AND b.end_time > ?
          ORDER BY b.start_time`
       )
       .all(end, start);
@@ -79,45 +86,187 @@ const Bookings = {
   get(id) {
     return db.prepare('SELECT * FROM bookings WHERE id = ?').get(id);
   },
+  // Alle bookinger som hører til samme lenke (én booking eller en hel serie).
+  byTokenHash(hash) {
+    return db.prepare('SELECT * FROM bookings WHERE manage_token_hash = ? ORDER BY start_time').all(hash);
+  },
+  bySeries(seriesId) {
+    return db.prepare('SELECT * FROM bookings WHERE series_id = ? ORDER BY start_time').all(seriesId);
+  },
   upcomingForRoom(roomId, nowIso) {
     return db
-      .prepare(`SELECT * FROM bookings WHERE room_id = ? AND status = 'confirmed' AND end_time > ? ORDER BY start_time`)
+      .prepare(`SELECT * FROM bookings WHERE room_id = ? AND ${ACTIVE} AND end_time > ? ORDER BY start_time`)
       .all(roomId, nowIso);
   },
-  hasOverlap(roomId, start, end, excludeId = null) {
-    const row = db
+  overlapping(roomId, start, end, excludeIds = []) {
+    const exclude = excludeIds.length ? `AND id NOT IN (${excludeIds.map(() => '?').join(',')})` : '';
+    return db
       .prepare(
-        `SELECT COUNT(*) AS n FROM bookings
-         WHERE room_id = ? AND status = 'confirmed'
-           AND start_time < ? AND end_time > ?
-           AND id != ?`
+        `SELECT * FROM bookings
+         WHERE room_id = ? AND ${ACTIVE}
+           AND start_time < ? AND end_time > ? ${exclude}
+         ORDER BY start_time`
       )
-      .get(roomId, end, start, excludeId || -1);
-    return row.n > 0;
+      .all(roomId, end, start, ...excludeIds);
   },
-  create({ roomId, title, organizerName, organizerEmail, notes, start, end }) {
-    const uid = `booking-${crypto.randomUUID()}@mettings.local`;
-    const stmt = db.prepare(
-      `INSERT INTO bookings (room_id, title, organizer_name, organizer_email, notes, start_time, end_time, ics_uid)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    const info = stmt.run(roomId, title, organizerName, organizerEmail, notes || null, start, end, uid);
+  hasOverlap(roomId, start, end, excludeId = null) {
+    return this.overlapping(roomId, start, end, excludeId ? [excludeId] : []).length > 0;
+  },
+  create({
+    roomId,
+    title,
+    organizerName,
+    organizerEmail,
+    notes,
+    start,
+    end,
+    status = 'confirmed',
+    expiresAt = null,
+    seriesId = null,
+    seriesRule = null,
+    occurrenceStart = null,
+    createdByAdminId = null,
+  }) {
+    const uid = `booking-${crypto.randomUUID()}@moterom`;
+    const tokenHash = hashToken(manageToken({ series_id: seriesId, ics_uid: uid }));
+    const info = db
+      .prepare(
+        `INSERT INTO bookings (room_id, title, organizer_name, organizer_email, notes, start_time, end_time, ics_uid,
+           status, expires_at, confirmed_at, manage_token_hash, series_id, series_rule, occurrence_start, created_by_admin_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        roomId,
+        title,
+        organizerName,
+        organizerEmail,
+        notes || null,
+        start,
+        end,
+        uid,
+        status,
+        expiresAt,
+        status === 'confirmed' ? new Date().toISOString() : null,
+        tokenHash,
+        seriesId,
+        seriesRule ? JSON.stringify(seriesRule) : null,
+        occurrenceStart,
+        createdByAdminId
+      );
     return this.get(info.lastInsertRowid);
   },
-  update(id, { title, organizerName, organizerEmail, notes, start, end }) {
+  confirm(id) {
     db.prepare(
-      `UPDATE bookings SET title = ?, organizer_name = ?, organizer_email = ?, notes = ?, start_time = ?, end_time = ?, updated_at = datetime('now')
+      `UPDATE bookings SET status = 'confirmed', confirmed_at = ${NOW}, expires_at = NULL, updated_at = datetime('now')
+       WHERE id = ? AND status = 'pending'`
+    ).run(id);
+    return this.get(id);
+  },
+  // Endringer i tid, tittel eller rom gir nytt sekvensnummer, så kalenderen oppdaterer avtalen.
+  update(id, { roomId, title, organizerName, organizerEmail, notes, start, end }) {
+    const current = this.get(id);
+    db.prepare(
+      `UPDATE bookings SET room_id = ?, title = ?, organizer_name = ?, organizer_email = ?, notes = ?, start_time = ?, end_time = ?,
+         ics_sequence = ics_sequence + 1, reminder_sent_at = CASE WHEN start_time = ? THEN reminder_sent_at ELSE NULL END,
+         updated_at = datetime('now')
        WHERE id = ?`
-    ).run(title, organizerName, organizerEmail, notes || null, start, end, id);
+    ).run(
+      roomId ?? current.room_id,
+      title ?? current.title,
+      organizerName ?? current.organizer_name,
+      organizerEmail ?? current.organizer_email,
+      notes === undefined ? current.notes : notes || null,
+      start ?? current.start_time,
+      end ?? current.end_time,
+      start ?? current.start_time,
+      id
+    );
     return this.get(id);
   },
   cancel(id) {
-    db.prepare(`UPDATE bookings SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?`).run(id);
+    db.prepare(
+      `UPDATE bookings SET status = 'cancelled', ics_sequence = ics_sequence + 1, updated_at = datetime('now') WHERE id = ?`
+    ).run(id);
     return this.get(id);
   },
-  bumpSequence(id) {
-    db.prepare('UPDATE bookings SET ics_sequence = ics_sequence + 1 WHERE id = ?').run(id);
-    return this.get(id);
+  countActivePendingForEmail(email) {
+    return db
+      .prepare(
+        `SELECT COUNT(DISTINCT COALESCE(series_id, ics_uid)) AS n FROM bookings
+         WHERE lower(organizer_email) = lower(?) AND status = 'pending' AND expires_at > ${NOW}`
+      )
+      .get(email).n;
+  },
+  // Bekreftede møter som starter innen et døgn, og som ble booket i god tid før.
+  dueReminders(nowIso, untilIso) {
+    return db
+      .prepare(
+        `SELECT * FROM bookings
+         WHERE status = 'confirmed' AND reminder_sent_at IS NULL AND anonymized_at IS NULL
+           AND start_time > ? AND start_time <= ?
+           AND COALESCE(confirmed_at, created_at) <= datetime(start_time, '-12 hours')
+         ORDER BY start_time`
+      )
+      .all(nowIso, untilIso);
+  },
+  markReminded(id) {
+    db.prepare(`UPDATE bookings SET reminder_sent_at = ${NOW} WHERE id = ?`).run(id);
+  },
+  deleteExpiredPending(beforeIso) {
+    return db.prepare(`DELETE FROM bookings WHERE status = 'pending' AND expires_at < ?`).run(beforeIso).changes;
+  },
+  // Fjerner personopplysninger, men beholder rom og tidspunkt for statistikk.
+  anonymize(where, ...params) {
+    return db
+      .prepare(
+        `UPDATE bookings SET title = 'Booking', organizer_name = 'Anonymisert', organizer_email = '', notes = NULL,
+           manage_token_hash = NULL, anonymized_at = ${NOW}
+         WHERE anonymized_at IS NULL AND ${where}`
+      )
+      .run(...params).changes;
+  },
+  anonymizeEndedBefore(iso) {
+    return this.anonymize('end_time < ?', iso);
+  },
+  findByEmail(email) {
+    return db
+      .prepare(
+        `SELECT b.*, r.name AS room_name FROM bookings b JOIN rooms r ON r.id = b.room_id
+         WHERE lower(b.organizer_email) = lower(?) ORDER BY b.start_time DESC`
+      )
+      .all(email);
+  },
+  anonymizeByEmail(email) {
+    return this.anonymize('lower(organizer_email) = lower(?)', email);
+  },
+};
+
+const RoomBlocks = {
+  get(id) {
+    return db.prepare('SELECT * FROM room_blocks WHERE id = ?').get(id);
+  },
+  overlapping(roomId, start, end) {
+    return db
+      .prepare('SELECT * FROM room_blocks WHERE room_id = ? AND start_time < ? AND end_time > ? ORDER BY start_time')
+      .all(roomId, end, start);
+  },
+  upcoming(nowIso) {
+    return db
+      .prepare(
+        `SELECT k.*, r.name AS room_name, a.username AS created_by_username FROM room_blocks k
+         JOIN rooms r ON r.id = k.room_id LEFT JOIN admin_users a ON a.id = k.created_by
+         WHERE k.end_time > ? ORDER BY k.start_time`
+      )
+      .all(nowIso);
+  },
+  create({ roomId, start, end, reason, createdBy }) {
+    const info = db
+      .prepare('INSERT INTO room_blocks (room_id, start_time, end_time, reason, created_by) VALUES (?, ?, ?, ?, ?)')
+      .run(roomId, start, end, reason || null, createdBy || null);
+    return this.get(info.lastInsertRowid);
+  },
+  delete(id) {
+    db.prepare('DELETE FROM room_blocks WHERE id = ?').run(id);
   },
 };
 
@@ -245,4 +394,4 @@ const AdminRequests = {
   }),
 };
 
-module.exports = { Rooms, Bookings, AdminUsers, AdminRequests };
+module.exports = { Rooms, Bookings, RoomBlocks, AdminUsers, AdminRequests };

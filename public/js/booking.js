@@ -8,8 +8,23 @@
   const successView = document.getElementById('bookingSuccessView');
   const panel = document.getElementById('booking');
   const chips = Array.from(document.querySelectorAll('.chip'));
-
+  const widget = form.querySelector('altcha-widget');
   const pad = (n) => String(n).padStart(2, '0');
+
+  // Romregler fra serveren: åpningstid, ukedager, maks varighet og hvor langt frem man kan booke.
+  const toMinutes = (hhmm) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return h * 60 + (m || 0);
+  };
+  const toHHMM = (minutes) => `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}:00`;
+  const rules = {
+    from: toMinutes(calendarEl.dataset.openFrom || '07:00'),
+    to: toMinutes(calendarEl.dataset.openTo || '20:00'),
+    days: (calendarEl.dataset.openDays || '0,1,2,3,4,5,6').split(',').filter(Boolean).map(Number),
+    maxMinutes: Number(calendarEl.dataset.maxMinutes) || null,
+    maxDays: Number(calendarEl.dataset.maxDays) || null,
+  };
+
   const toDateValue = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const toTimeValue = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   const fmtDay = new Intl.DateTimeFormat('nb-NO', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -47,22 +62,24 @@
     chips.forEach((chip) => chip.setAttribute('aria-pressed', String(Number(chip.dataset.minutes) === minutes)));
   }
 
-  const DAY_START = 7 * 60;
-  const DAY_END = 19 * 60;
   const minutesOf = (d) => d.getHours() * 60 + d.getMinutes();
+  const DEFAULT_MINUTES = Math.min(60, rules.maxMinutes || 60);
   const withinDay = (start, end) =>
-    start.toDateString() === end.toDateString() && minutesOf(start) >= DAY_START && minutesOf(end) <= DAY_END;
+    start.toDateString() === end.toDateString() &&
+    rules.days.includes(start.getDay()) &&
+    minutesOf(start) >= rules.from &&
+    minutesOf(end) <= rules.to;
 
-  // Neste hele eller halve time fra nå; utenfor 07–19 blir det neste dag kl. 08.
+  // Neste hele eller halve time fra nå; utenfor åpningstiden blir det første åpne dag.
   function defaultRange() {
     const start = new Date();
     start.setSeconds(0, 0);
     start.setMinutes(start.getMinutes() < 30 ? 30 : 60);
-    if (!withinDay(start, new Date(start.getTime() + 60 * 60000))) {
-      if (minutesOf(start) >= DAY_START) start.setDate(start.getDate() + 1);
-      start.setHours(8, 0, 0, 0);
+    for (let i = 0; i < 14 && !withinDay(start, new Date(start.getTime() + DEFAULT_MINUTES * 60000)); i++) {
+      if (minutesOf(start) >= rules.from) start.setDate(start.getDate() + 1);
+      start.setHours(Math.floor(Math.max(rules.from, 8 * 60) / 60), rules.from % 60, 0, 0);
     }
-    return { start, end: new Date(start.getTime() + 60 * 60000) };
+    return { start, end: new Date(start.getTime() + DEFAULT_MINUTES * 60000) };
   }
 
   let autoPicked = false;
@@ -73,7 +90,7 @@
     const step = 30 * 60000;
     let start = defaultRange().start;
     while (start < limit) {
-      const end = new Date(start.getTime() + 60 * 60000);
+      const end = new Date(start.getTime() + DEFAULT_MINUTES * 60000);
       const outside = !withinDay(start, end);
       const busy = events.some((e) => e.start < end && e.end > start);
       if (!outside && !busy) return { start, end };
@@ -119,6 +136,10 @@
     if (!range) fail('time', 'Velg dato og tidspunkt.');
     else if (range.end <= range.start) fail('time', 'Sluttid må være etter starttid.');
     else if (range.start < new Date()) fail('time', 'Tidspunktet har allerede passert.');
+    else if (!withinDay(range.start, range.end)) fail('time', 'Tiden er utenfor når rommet kan bookes.');
+    else if (rules.maxMinutes && (range.end - range.start) / 60000 > rules.maxMinutes) {
+      fail('time', `Rommet kan bookes i maks ${rules.maxMinutes} minutter om gangen.`);
+    }
 
     if (!form.title.value.trim()) fail('title', 'Skriv kort hva møtet gjelder.');
     if (!form.organizerName.value.trim()) fail('organizerName', 'Skriv inn navnet ditt.');
@@ -137,10 +158,14 @@
     height: 'auto',
     allDaySlot: false,
     nowIndicator: true,
-    slotMinTime: '07:00:00',
-    slotMaxTime: '20:00:00',
+    slotMinTime: toHHMM(Math.floor(Math.min(rules.from, 7 * 60) / 60) * 60),
+    slotMaxTime: toHHMM(Math.ceil(Math.max(rules.to, 19 * 60) / 60) * 60),
     snapDuration: '00:15:00',
-    businessHours: { daysOfWeek: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '17:00' },
+    businessHours: { daysOfWeek: rules.days, startTime: toHHMM(rules.from), endTime: toHHMM(rules.to) },
+    selectConstraint: 'businessHours',
+    validRange: rules.maxDays
+      ? () => ({ end: new Date(Date.now() + (rules.maxDays + 1) * 24 * 3600 * 1000) })
+      : undefined,
     slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     dayHeaderFormat: { weekday: 'short', day: 'numeric' },
@@ -245,7 +270,18 @@
     submitBtn.disabled = true;
     submitBtn.textContent = 'Booker …';
 
+    let altcha = captchaPayload || new FormData(form).get('altcha');
+    if (!altcha && widget && widget.verify) {
+      submitBtn.textContent = 'Sjekker at du ikke er en robot …';
+      try {
+        await widget.verify();
+      } catch (_) {}
+      altcha = captchaPayload || new FormData(form).get('altcha');
+    }
+
     const payload = {
+      altcha,
+      website: form.website.value,
       title: form.title.value.trim(),
       organizerName: form.organizerName.value.trim(),
       organizerEmail: form.organizerEmail.value.trim(),
@@ -262,15 +298,18 @@
       });
       const data = await res.json().catch(() => ({}));
 
-      if (res.status === 409) {
+      if (res.status === 409 && data.code === 'taken') {
         showAlert('Noen andre har nettopp booket deler av denne tiden. Velg en annen tid.');
         calendar.refetchEvents();
+        resetCaptcha();
         return;
       }
       if (!res.ok) {
         showAlert(data.error || 'Vi fikk ikke lagret bookingen. Prøv igjen om litt.');
+        resetCaptcha();
         return;
       }
+      resetCaptcha();
 
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ name: payload.organizerName, email: payload.organizerEmail }));
@@ -279,9 +318,20 @@
       document.getElementById('successWhen').textContent =
         `${fmtDay.format(range.start)}, ${fmtTime.format(range.start)}–${fmtTime.format(range.end)}`;
       document.getElementById('successTitleText').textContent = payload.title;
-      document.getElementById('successMail').textContent = data.mailSent
-        ? `Kalenderinvitasjonen er sendt til ${payload.organizerEmail}.`
-        : 'Bookingen er lagret, men vi fikk ikke sendt e-post akkurat nå. Ta gjerne et skjermbilde.';
+      const pending = data.status === 'pending';
+      document.getElementById('successTitle').textContent = pending ? 'Sjekk e-posten din' : 'Møtet er booket';
+      document.getElementById('successMail').textContent = pending
+        ? `Vi har sendt en lenke til ${payload.organizerEmail}. Åpne den innen ${data.holdMinutes} minutter for å bekrefte; tiden holdes av til da.`
+        : data.mailSent
+          ? `Kalenderinvitasjonen er sendt til ${payload.organizerEmail}.`
+          : 'Bookingen er lagret, men vi fikk ikke sendt e-post.';
+      const manage = document.getElementById('successManage');
+      manage.hidden = !data.manageUrl;
+      if (data.manageUrl) {
+        const link = document.getElementById('successManageLink');
+        link.href = data.manageUrl;
+        link.textContent = data.manageUrl;
+      }
 
       formView.hidden = true;
       successView.hidden = false;
@@ -295,6 +345,18 @@
       submitBtn.textContent = 'Book møte';
     }
   });
+
+  let captchaPayload = null;
+  if (widget) {
+    widget.addEventListener('statechange', (e) => {
+      captchaPayload = e.detail && e.detail.state === 'verified' ? e.detail.payload : null;
+    });
+  }
+  // En løst oppgave kan bare brukes én gang.
+  function resetCaptcha() {
+    captchaPayload = null;
+    if (widget && widget.reset) widget.reset();
+  }
 
   const initial = defaultRange();
   writeRange(initial.start, initial.end);

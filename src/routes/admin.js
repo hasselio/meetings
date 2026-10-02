@@ -3,11 +3,12 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { Rooms, Bookings, AdminUsers, AdminRequests } = require('../models');
 const {
-  sendBookingCancellation,
+  sendCancellation,
   notifyNewAccessRequest,
   notifyAccessDecision,
   notifyPasswordReset,
 } = require('../services/mailer');
+const BookingService = require('../services/bookings');
 const { requireAdmin } = require('../middleware/auth');
 const { createLimiter } = require('../middleware/rate-limit');
 const { challengeHandler, verifyCaptcha } = require('../captcha');
@@ -147,7 +148,7 @@ router.use((req, res, next) => {
       ? 'account'
       : req.path.startsWith('/rom')
         ? 'rooms'
-        : req.path.startsWith('/logg')
+        : req.path.startsWith('/logg') || req.path.startsWith('/personvern')
           ? 'audit'
           : 'bookings';
   res.locals.me = req.admin;
@@ -242,8 +243,12 @@ router.post('/rom/:id/slett', manageRooms, async (req, res) => {
     { type: 'room', id: room.id }
   );
 
-  const results = await Promise.allSettled(upcoming.map((b) => sendBookingCancellation(b, room)));
-  const notified = results.filter((r) => r.status === 'fulfilled' && r.value.sent).length;
+  // Bare bekreftede bookinger har fått en invitasjon som må avlyses.
+  const confirmed = upcoming.filter((b) => b.status === 'confirmed').map((b) => ({ ...b, ics_sequence: b.ics_sequence + 1 }));
+  const results = await Promise.allSettled(
+    confirmed.map((b) => sendCancellation([b], room, { wholeSeries: false, reason: 'Rommet er tatt ut av bruk.' }))
+  );
+  const notified = results.filter((r) => r.status === 'fulfilled' && r.value.sent).length + (upcoming.length - confirmed.length);
 
   let text = `«${room.name}» er slettet.`;
   if (upcoming.length) {
@@ -270,8 +275,10 @@ router.get('/api/rooms/:id/events', (req, res) => {
     start: b.start_time,
     end: b.end_time,
     title: b.title,
-    classNames: ['ev-booking'],
+    classNames: b.status === 'pending' ? ['ev-booking', 'ev-pending'] : ['ev-booking'],
     extendedProps: {
+      status: b.status,
+      seriesId: b.series_id,
       color: room.color,
       roomName: room.name,
       organizerName: b.organizer_name,
@@ -291,23 +298,15 @@ router.get('/api/bookings/:id', (req, res) => {
 router.post('/api/bookings/:id/cancel', requirePermission('bookings.manage'), async (req, res) => {
   const booking = Bookings.get(req.params.id);
   if (!booking) return res.status(404).json({ error: 'Booking ikke funnet' });
-  const room = Rooms.get(booking.room_id);
-
-  const cancelled = Bookings.cancel(booking.id);
-  audit.byAdmin(req, 'booking.cancelled', `Avlyste «${booking.title}» i ${room.name} for ${booking.organizer_name}`, {
-    type: 'booking',
-    id: booking.id,
+  const scope = req.body && req.body.scope === 'series' && booking.series_id ? 'series' : 'one';
+  const targets = scope === 'series' ? Bookings.bySeries(booking.series_id) : [booking];
+  const result = await BookingService.cancel(targets, {
+    actor: { type: 'admin', req },
+    wholeSeries: scope === 'series',
+    reason: (req.body && String(req.body.reason || '').trim().slice(0, 300)) || null,
   });
-
-  let mailResult = { sent: false };
-  try {
-    mailResult = await sendBookingCancellation(booking, room);
-    if (mailResult.sent) Bookings.bumpSequence(booking.id);
-  } catch (err) {
-    console.error('Kunne ikke sende avlysning for booking #%s:', booking.id, err);
-  }
-
-  res.json({ booking: cancelled, mailSent: mailResult.sent });
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  res.json({ cancelled: result.cancelled.length, mailSent: result.mailSent });
 });
 
 // --- Tilgangsstyring (kun rollen administrator) ---
@@ -582,6 +581,62 @@ router.get('/logg', requirePermission('audit.view'), (req, res) => {
     retentionMonths: config.auditRetentionMonths,
     timezone: config.timezone,
   });
+});
+
+// --- Innsyn og sletting av personopplysninger (én e-postadresse) ---
+const time = require('../time');
+
+function renderPrivacy(res, { email = '', bookings = null, done = null, error = null, status = 200 } = {}) {
+  const nowIso = new Date().toISOString();
+  res.status(status).render('admin/privacy', {
+    email,
+    done,
+    error,
+    retentionMonths: config.retentionMonths,
+    bookings:
+      bookings &&
+      bookings.map((b) => ({
+        ...b,
+        when: time.formatRange(b.start_time, b.end_time),
+        upcoming: b.end_time > nowIso && b.status !== 'cancelled',
+      })),
+  });
+}
+
+router.get('/personvern', requirePermission('privacy.manage'), (req, res) => renderPrivacy(res));
+
+// Søket sendes som POST, så e-postadressen ikke havner i adresselinjen eller serverlogger.
+router.post('/personvern', requirePermission('privacy.manage'), (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase().slice(0, 120);
+  if (!EMAIL_RE.test(email)) return renderPrivacy(res, { email, error: 'Skriv inn en gyldig e-postadresse.', status: 400 });
+  renderPrivacy(res, { email, bookings: Bookings.findByEmail(email).filter((b) => !b.anonymized_at) });
+});
+
+router.post('/personvern/slett', requirePermission('privacy.manage'), async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase().slice(0, 120);
+  if (!EMAIL_RE.test(email)) return renderPrivacy(res, { error: 'Skriv inn en gyldig e-postadresse.', status: 400 });
+
+  const all = Bookings.findByEmail(email).filter((b) => !b.anonymized_at);
+  const nowIso = new Date().toISOString();
+  const upcoming = all.filter((b) => b.end_time > nowIso && b.status !== 'cancelled');
+  // Kommende møter avlyses først, så personen får beskjed og tiden blir ledig.
+  const groups = new Map();
+  for (const b of upcoming) {
+    const key = b.series_id || `b${b.id}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(b);
+  }
+  for (const group of groups.values()) {
+    await BookingService.cancel(group, {
+      actor: { type: 'admin', req },
+      wholeSeries: false,
+      reason: 'Opplysningene dine er slettet etter ønske.',
+    });
+  }
+  const count = Bookings.anonymizeByEmail(email);
+  // Selve e-postadressen logges ikke, ellers ville loggen fortsatt inneholde den.
+  audit.byAdmin(req, 'access.privacy_erased', `Slettet personopplysninger fra ${count} booking(er) etter forespørsel`);
+  renderPrivacy(res, { done: { count, cancelled: upcoming.length } });
 });
 
 module.exports = router;

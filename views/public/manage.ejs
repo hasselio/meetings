@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: first.title }) %>
+  <meta name="robots" content="noindex" />
+</head>
+<body>
+  <%- include('../partials/public-header') %>
+
+  <main id="innhold" class="container container-narrow">
+    <% if (room) { %>
+      <a class="back-link" href="/rom/<%= room.id %>"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %><%= room.name %></a>
+    <% } %>
+
+    <div class="page-head">
+      <div>
+        <p class="eyebrow"><%= isSeries ? 'Gjentakende møte' : 'Din booking' %></p>
+        <h1 class="title"><%= first.title %></h1>
+        <p class="lede">
+          <% if (room) { %><%= room.name %><% if (room.location) { %>, <%= room.location %><% } %> · <% } %>booket av <%= first.organizer_name %>
+        </p>
+      </div>
+    </div>
+
+    <% if (message) { %>
+      <div class="alert alert-success" role="status"><%- include('../partials/icon', { name: 'check', size: 16 }) %><span><%= message %></span></div>
+    <% } %>
+    <% if (error) { %>
+      <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= error %></span></div>
+    <% } %>
+
+    <% if (needsConfirm) { %>
+      <section class="confirm-card" aria-labelledby="confirm-title">
+        <div>
+          <h2 class="panel-title" id="confirm-title">Bekreft bookingen</h2>
+          <p class="panel-sub">Tiden holdes av for deg en kort stund. Når du bekrefter, gjelder bookingen og du får en kalenderinvitasjon.</p>
+        </div>
+        <form method="post" action="/booking/<%= token %>/bekreft">
+          <button type="submit" class="btn btn-primary"><%- include('../partials/icon', { name: 'check', size: 16 }) %>Bekreft bookingen</button>
+        </form>
+      </section>
+    <% } %>
+
+    <section class="section" aria-labelledby="times-title">
+      <h2 class="section-title" id="times-title"><%= isSeries ? 'Møtene i serien' : 'Tidspunkt' %> <% if (isSeries) { %><span class="count"><%= bookings.length %></span><% } %></h2>
+      <ul class="request-list">
+        <% bookings.forEach(function (b) {
+          const editable = !b.past && b.state === 'confirmed';
+          const cancellable = !b.past && (b.state === 'confirmed' || b.state === 'pending');
+          const label = b.state === 'cancelled' ? 'Avbestilt' : b.past ? 'Gjennomført' : b.state === 'pending' ? 'Venter på bekreftelse' : b.state === 'expired' ? 'Ikke bekreftet i tide' : 'Bekreftet';
+          const tone = b.state === 'cancelled' || b.state === 'expired' ? 'muted' : b.past ? 'muted' : b.state === 'pending' ? 'warning' : 'free';
+          const v = editId === b.id && values ? values : { date: b.date, startTime: b.from, endTime: b.to, title: b.title, notes: b.notes || '' };
+        %>
+          <li class="request manage-item <%= b.state === 'cancelled' ? 'is-cancelled' : '' %>">
+            <div class="manage-row">
+              <div class="request-main">
+                <div class="request-name tabular"><%= b.when %></div>
+                <div class="request-meta">
+                  <span class="tag tag-<%= tone %>"><%= label %></span>
+                  <% if (b.room && room && b.room.id !== room.id) { %><span><%= b.room.name %></span><% } %>
+                  <% if (isSeries && b.title !== first.title) { %><span><%= b.title %></span><% } %>
+                </div>
+              </div>
+              <% if (cancellable) { %>
+                <div class="request-actions">
+                  <% if (editable) { %>
+                    <button type="button" class="btn btn-secondary btn-sm" data-toggle-edit="edit-<%= b.id %>" aria-expanded="<%= editId === b.id ? 'true' : 'false' %>" aria-controls="edit-<%= b.id %>">
+                      <%- include('../partials/icon', { name: 'pencil', size: 14 }) %>Endre
+                    </button>
+                  <% } %>
+                  <form method="post" action="/booking/<%= token %>/avbestill">
+                    <input type="hidden" name="id" value="<%= b.id %>" />
+                    <button type="submit" class="btn btn-danger btn-sm" data-confirm data-confirm-label="Bekreft avbestilling">Avbestill</button>
+                  </form>
+                </div>
+              <% } %>
+            </div>
+            <% if (editable) { %>
+              <form class="manage-edit" id="edit-<%= b.id %>" method="post" action="/booking/<%= token %>/endre" <%= editId === b.id ? '' : 'hidden' %>>
+                <input type="hidden" name="id" value="<%= b.id %>" />
+                <div class="field-row field-row-3">
+                  <div class="field">
+                    <label for="date-<%= b.id %>">Dato</label>
+                    <input class="input" type="date" id="date-<%= b.id %>" name="date" value="<%= v.date %>" required />
+                  </div>
+                  <div class="field">
+                    <label for="from-<%= b.id %>">Fra</label>
+                    <input class="input" type="time" id="from-<%= b.id %>" name="startTime" step="900" value="<%= v.startTime %>" required />
+                  </div>
+                  <div class="field">
+                    <label for="to-<%= b.id %>">Til</label>
+                    <input class="input" type="time" id="to-<%= b.id %>" name="endTime" step="900" value="<%= v.endTime %>" required />
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="title-<%= b.id %>">Hva er møtet?</label>
+                  <input class="input" type="text" id="title-<%= b.id %>" name="title" maxlength="120" value="<%= v.title %>" required />
+                </div>
+                <div class="field">
+                  <label for="notes-<%= b.id %>">Notat <span class="label-hint">(valgfritt)</span></label>
+                  <textarea class="input" id="notes-<%= b.id %>" name="notes" rows="2" maxlength="500"><%= v.notes %></textarea>
+                </div>
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-primary">Lagre endringen</button>
+                  <button type="button" class="btn btn-ghost" data-toggle-edit="edit-<%= b.id %>">Avbryt</button>
+                </div>
+              </form>
+            <% } %>
+          </li>
+        <% }) %>
+      </ul>
+
+      <% if (isSeries && upcoming.length > 1) { %>
+        <form class="series-cancel" method="post" action="/booking/<%= token %>/avbestill">
+          <input type="hidden" name="id" value="alle" />
+          <button type="submit" class="btn btn-danger" data-confirm data-confirm-label="Bekreft: avbestill <%= upcoming.length %> møter">
+            <%- include('../partials/icon', { name: 'trash', size: 15 }) %>Avbestill alle kommende møter
+          </button>
+        </form>
+      <% } %>
+    </section>
+
+    <p class="panel-note manage-note">
+      Lenken til denne siden er personlig: alle som har den, kan endre og avbestille. Del den bare med de som skal kunne gjøre det.
+      Les om hvordan vi behandler opplysningene i <a href="/personvern">personvernerklæringen</a>.
+    </p>
+  </main>
+
+  <%- include('../partials/public-footer') %>
+  <script src="/js/ui.js" defer></script>
+  <script src="/js/manage.js" defer></script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 const { deleteExpiredSessions } = require('./session-store');
 const audit = require('./audit');
 const config = require('./config');
+const maintenance = require('./services/maintenance');
 
 const INTERVAL_MS = 10 * 60 * 1000;
 
@@ -8,6 +9,9 @@ const INTERVAL_MS = 10 * 60 * 1000;
 const tasks = [
   ['utløpte innlogginger', deleteExpiredSessions],
   ['gammel revisjonslogg', () => audit.deleteOlderThan(config.auditRetentionMonths)],
+  ['påminnelser', () => maintenance.sendReminders()],
+  ['ubekreftede bookinger', () => maintenance.deleteStalePending()],
+  ['sletting av personopplysninger', () => maintenance.applyRetention()],
 ];
 
 function register(name, fn) {

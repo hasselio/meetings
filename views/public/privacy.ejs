@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Personvern', description: 'Hvordan møteromsbookingen behandler personopplysninger.' }) %>
+</head>
+<body>
+  <%- include('../partials/public-header') %>
+
+  <main id="innhold" class="container container-narrow">
+    <a class="back-link" href="/"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %>Alle rom</a>
+    <div class="page-head">
+      <div>
+        <h1 class="title">Personvern</h1>
+        <p class="lede">Slik behandler vi opplysningene du oppgir når du booker et møterom.</p>
+      </div>
+    </div>
+
+    <article class="prose">
+      <h2>Hva vi lagrer</h2>
+      <p>Når du booker, lagrer vi:</p>
+      <ul>
+        <li>navnet og e-postadressen din</li>
+        <li>hva møtet gjelder, og notatet hvis du skriver et</li>
+        <li>rom, dato og klokkeslett</li>
+      </ul>
+      <p>Andre som ser kalenderen, ser bare at rommet er opptatt. Bare de som forvalter møterommene, ser hvem som har booket og hva møtet gjelder.</p>
+
+      <h2>Hvorfor</h2>
+      <p>Vi trenger opplysningene for å sette av rommet, sende deg bekreftelse og kalenderinvitasjon, minne deg på møtet, og la deg endre eller avbestille. Vi bruker dem ikke til noe annet, og deler dem ikke med andre.</p>
+
+      <h2>Hvor lenge</h2>
+      <ul>
+        <li>Bookinger du ikke bekrefter, frigis etter <%= holdMinutes %> minutter og slettes etter et døgn.</li>
+        <li>Navn, e-post, møtetittel og notat slettes automatisk <%= retentionMonths %> måneder etter møtet. Vi beholder bare rom og tidspunkt, uten noe som peker på deg, for å se hvor mye rommene brukes.</li>
+        <li>Endringsloggen (hvem som booket, endret eller avlyste hva) kan inneholde navnet ditt og møtetittelen, og slettes etter <%= auditRetentionMonths %> måneder.</li>
+      </ul>
+
+      <h2>Informasjonskapsler og lagring i nettleseren</h2>
+      <p>Den offentlige siden setter ingen informasjonskapsler. Nettleseren din husker navnet og e-posten du sist brukte, og om du har valgt lyst eller mørkt tema, så du slipper å fylle inn på nytt. Dette ligger bare på din enhet. Administratorer får en informasjonskapsel for å holde seg innlogget.</p>
+      <p>For å stoppe automatiske bookinger løser nettleseren din en liten regneoppgave før skjemaet sendes. Det skjer på din enhet, uten informasjonskapsler eller tredjeparter.</p>
+
+      <h2>Dine rettigheter</h2>
+      <p>Du kan endre eller avbestille selv via lenken i e-posten. Du har også rett til innsyn i, retting og sletting av opplysningene om deg.
+        <% if (contact) { %>Ta kontakt på <a href="mailto:<%= contact %>"><%= contact %></a>, så hjelper vi deg.<% } else { %>Ta kontakt med den som forvalter møterommene, så hjelper vi deg.<% } %>
+        Mener du at vi behandler opplysningene feil, kan du klage til Datatilsynet.</p>
+    </article>
+  </main>
+
+  <%- include('../partials/public-footer') %>
+</body>
+</html>
