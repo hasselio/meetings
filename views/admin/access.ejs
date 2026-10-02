@@ -10,7 +10,12 @@
     <div class="page-head">
       <div>
         <h1 class="title">Tilgang</h1>
-        <p class="lede">Godkjenn eller avslå forespørsler om admintilgang, og administrer kontoene til de som har tilgang.</p>
+        <p class="lede">Godkjenn eller avslå forespørsler om tilgang, velg rolle, og administrer kontoene til de som har tilgang.</p>
+        <ul class="role-legend">
+          <% Object.values(roles).forEach(function (role) { %>
+            <li><strong><%= role.label %>:</strong> <%= role.description %></li>
+          <% }) %>
+        </ul>
       </div>
     </div>
 
@@ -49,7 +54,13 @@
                 <form method="post" action="/admin/tilgang/<%= r.id %>/avsla">
                   <button type="submit" class="btn btn-secondary btn-sm">Avslå</button>
                 </form>
-                <form method="post" action="/admin/tilgang/<%= r.id %>/godkjenn">
+                <form method="post" action="/admin/tilgang/<%= r.id %>/godkjenn" class="approve-form">
+                  <label class="sr-only" for="role-<%= r.id %>">Rolle for <%= r.name %></label>
+                  <select class="input input-sm" id="role-<%= r.id %>" name="role">
+                    <% Object.entries(roles).forEach(function ([key, role]) { %>
+                      <option value="<%= key %>" <%= key === 'viewer' ? 'selected' : '' %>><%= role.label %></option>
+                    <% }) %>
+                  </select>
                   <button type="submit" class="btn btn-primary btn-sm" data-confirm data-confirm-label="Bekreft godkjenning">
                     <%- include('../partials/icon', { name: 'check', size: 14 }) %>Godkjenn
                   </button>
@@ -62,13 +73,14 @@
     </section>
 
     <section class="section" aria-labelledby="admins-title">
-      <h2 class="section-title" id="admins-title">Administratorer <span class="count"><%= admins.length %></span></h2>
+      <h2 class="section-title" id="admins-title">Brukere med tilgang <span class="count"><%= admins.length %></span></h2>
       <ul class="request-list">
         <% admins.forEach(function (a) { const self = a.id === adminId; %>
           <li class="request request-compact">
             <div class="request-main">
               <div class="request-name">
                 <%= a.name || a.username %><% if (self) { %> <span class="you">deg</span><% } %>
+                <span class="tag tag-role tag-role-<%= a.role %>"><%= roleLabel(a.role) %></span>
                 <% if (a.must_change_password) { %><span class="tag tag-warning">Må velge nytt passord</span><% } %>
               </div>
               <div class="request-meta">

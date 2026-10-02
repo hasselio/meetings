@@ -5,9 +5,15 @@
     <nav class="nav nav-primary" aria-label="Adminmeny">
       <a class="nav-link" href="/admin" <%- locals.section === 'bookings' ? 'aria-current="page"' : '' %>>Bookinger</a>
       <a class="nav-link" href="/admin/rom" <%- locals.section === 'rooms' ? 'aria-current="page"' : '' %>>Rom</a>
-      <a class="nav-link" href="/admin/tilgang" <%- locals.section === 'access' ? 'aria-current="page"' : '' %>>
-        Tilgang<% if (locals.pendingCount) { %> <span class="badge" aria-label="<%= pendingCount %> venter"><%= pendingCount %></span><% } %>
-      </a>
+      <% const allowed = (p) => Boolean(locals.can && locals.can(p)); %>
+      <% if (allowed('access.manage')) { %>
+        <a class="nav-link" href="/admin/tilgang" <%- locals.section === 'access' ? 'aria-current="page"' : '' %>>
+          Tilgang<% if (locals.pendingCount) { %> <span class="badge" aria-label="<%= pendingCount %> venter"><%= pendingCount %></span><% } %>
+        </a>
+      <% } %>
+      <% if (allowed('audit.view')) { %>
+        <a class="nav-link" href="/admin/logg" <%- locals.section === 'audit' ? 'aria-current="page"' : '' %>>Logg</a>
+      <% } %>
     </nav>
     <div class="nav nav-secondary">
       <a class="nav-link" href="/" data-preview aria-label="Se som besøkende">

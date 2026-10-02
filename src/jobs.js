@@ -1,9 +1,14 @@
 const { deleteExpiredSessions } = require('./session-store');
+const audit = require('./audit');
+const config = require('./config');
 
 const INTERVAL_MS = 10 * 60 * 1000;
 
 // Oppgaver som kjøres jevnlig. Hver oppgave feiler for seg, så én feil stopper ikke de andre.
-const tasks = [['utløpte innlogginger', deleteExpiredSessions]];
+const tasks = [
+  ['utløpte innlogginger', deleteExpiredSessions],
+  ['gammel revisjonslogg', () => audit.deleteOlderThan(config.auditRetentionMonths)],
+];
 
 function register(name, fn) {
   tasks.push([name, fn]);

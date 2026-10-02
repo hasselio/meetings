@@ -12,6 +12,8 @@ const { requireAdmin } = require('../middleware/auth');
 const { createLimiter } = require('../middleware/rate-limit');
 const { challengeHandler, verifyCaptcha } = require('../captcha');
 const { parseRange } = require('../availability');
+const { ROLES, isRole, can, roleLabel, requirePermission } = require('../roles');
+const audit = require('../audit');
 const Facilities = require('../facilities');
 const config = require('../config');
 
@@ -45,10 +47,25 @@ router.post('/login', (req, res) => {
   const valid = bcrypt.compareSync(password, user ? user.password_hash : DUMMY_HASH);
   if (!user || !valid) {
     loginLimiter.hit(key);
+    audit.log({
+      actorType: 'visitor',
+      actorName: username.slice(0, 40) || null,
+      action: 'login.failed',
+      summary: `Mislykket innlogging som «${username.slice(0, 40)}»`,
+      ip: req.ip,
+    });
     return fail(401, 'Feil brukernavn eller passord.');
   }
 
   loginLimiter.reset(key);
+  audit.log({
+    actorType: 'admin',
+    actorId: user.id,
+    actorName: user.username,
+    action: 'login.success',
+    summary: `${user.username} logget inn`,
+    ip: req.ip,
+  });
   startSession(req, res, user, user.must_change_password ? '/admin/nytt-passord' : '/admin');
 });
 
@@ -110,6 +127,10 @@ router.post('/be-om-tilgang', verifyCaptcha, (req, res) => {
     ...values,
     passwordHash: bcrypt.hashSync(req.body.password, 12),
   });
+  audit.byVisitor(req, 'access.requested', `${request.name} ba om tilgang som «${request.username}»`, {
+    type: 'request',
+    id: request.id,
+  }, request.name);
   notifyNewAccessRequest(request).catch((err) => console.error('Kunne ikke varsle om ny tilgangsforespørsel:', err));
   res.render('admin/request-sent');
 });
@@ -126,8 +147,12 @@ router.use((req, res, next) => {
       ? 'account'
       : req.path.startsWith('/rom')
         ? 'rooms'
-        : 'bookings';
+        : req.path.startsWith('/logg')
+          ? 'audit'
+          : 'bookings';
   res.locals.me = req.admin;
+  res.locals.can = (permission) => can(req.admin, permission);
+  res.locals.roleLabel = roleLabel;
   res.locals.flash = req.session.flash || null;
   delete req.session.flash;
   next();
@@ -169,43 +194,53 @@ router.get('/rom', (req, res) => {
   res.render('admin/rooms', { rooms });
 });
 
-router.get('/rom/ny', (req, res) => {
+const manageRooms = requirePermission('rooms.manage');
+
+router.get('/rom/ny', manageRooms, (req, res) => {
   const used = new Set(Rooms.all().map((r) => r.color));
   const color = ROOM_COLORS.find((c) => !used.has(c)) || ROOM_COLORS[0];
   renderRoomForm(res, { color }, null);
 });
 
-router.post('/rom', (req, res) => {
+router.post('/rom', manageRooms, (req, res) => {
   const input = roomInput(req.body);
   if (!input.name) return renderRoomForm(res, input, 'Gi rommet et navn.');
   const room = Rooms.create(input);
+  audit.byAdmin(req, 'room.created', `La til rommet «${room.name}»`, { type: 'room', id: room.id });
   req.session.flash = { type: 'success', text: `«${room.name}» er lagt til og kan bookes.` };
   res.redirect('/admin/rom');
 });
 
-router.get('/rom/:id/rediger', (req, res) => {
+router.get('/rom/:id/rediger', manageRooms, (req, res) => {
   const room = Rooms.get(req.params.id);
   if (!room) return res.status(404).render('public/not-found');
   renderRoomForm(res, room, null);
 });
 
-router.post('/rom/:id', (req, res) => {
+router.post('/rom/:id', manageRooms, (req, res) => {
   const room = Rooms.get(req.params.id);
   if (!room) return res.status(404).render('public/not-found');
   const input = roomInput(req.body);
   if (!input.name) return renderRoomForm(res, { ...input, id: room.id }, 'Gi rommet et navn.');
   Rooms.update(room.id, input);
+  audit.byAdmin(req, 'room.updated', `Endret rommet «${input.name}»`, { type: 'room', id: room.id });
   req.session.flash = { type: 'success', text: `Endringene i «${input.name}» er lagret.` };
   res.redirect('/admin/rom');
 });
 
-router.post('/rom/:id/slett', async (req, res) => {
+router.post('/rom/:id/slett', manageRooms, async (req, res) => {
   const room = Rooms.get(req.params.id);
   if (!room) return res.status(404).render('public/not-found');
 
   // Bookingene slettes sammen med rommet, så de som har booket må få avlysning først.
   const upcoming = Bookings.upcomingForRoom(room.id, new Date().toISOString());
   Rooms.delete(room.id);
+  audit.byAdmin(
+    req,
+    'room.deleted',
+    `Slettet rommet «${room.name}»${upcoming.length ? ` og avlyste ${upcoming.length} kommende booking(er)` : ''}`,
+    { type: 'room', id: room.id }
+  );
 
   const results = await Promise.allSettled(upcoming.map((b) => sendBookingCancellation(b, room)));
   const notified = results.filter((r) => r.status === 'fulfilled' && r.value.sent).length;
@@ -253,12 +288,16 @@ router.get('/api/bookings/:id', (req, res) => {
   res.json(booking);
 });
 
-router.post('/api/bookings/:id/cancel', async (req, res) => {
+router.post('/api/bookings/:id/cancel', requirePermission('bookings.manage'), async (req, res) => {
   const booking = Bookings.get(req.params.id);
   if (!booking) return res.status(404).json({ error: 'Booking ikke funnet' });
   const room = Rooms.get(booking.room_id);
 
   const cancelled = Bookings.cancel(booking.id);
+  audit.byAdmin(req, 'booking.cancelled', `Avlyste «${booking.title}» i ${room.name} for ${booking.organizer_name}`, {
+    type: 'booking',
+    id: booking.id,
+  });
 
   let mailResult = { sent: false };
   try {
@@ -271,9 +310,12 @@ router.post('/api/bookings/:id/cancel', async (req, res) => {
   res.json({ booking: cancelled, mailSent: mailResult.sent });
 });
 
-// --- Tilgangsstyring ---
+// --- Tilgangsstyring (kun rollen administrator) ---
+router.use(['/tilgang', '/administratorer'], requirePermission('access.manage'));
+
 router.get('/tilgang', (req, res) => {
   res.render('admin/access', {
+    roles: ROLES,
     requests: AdminRequests.pending(),
     admins: AdminUsers.all(),
     decisions: AdminRequests.recentDecisions(),
@@ -283,8 +325,9 @@ router.get('/tilgang', (req, res) => {
 
 function decide(approve) {
   return (req, res) => {
+    const role = isRole(req.body.role) ? req.body.role : 'viewer';
     const result = approve
-      ? AdminRequests.approve(Number(req.params.id), req.session.adminId)
+      ? AdminRequests.approve(Number(req.params.id), req.session.adminId, role)
       : AdminRequests.decline(Number(req.params.id), req.session.adminId);
 
     if (result.error) {
@@ -293,10 +336,18 @@ function decide(approve) {
     }
 
     const { request } = result;
+    audit.byAdmin(
+      req,
+      approve ? 'access.approved' : 'access.declined',
+      approve
+        ? `Godkjente ${request.name} («${request.username}») som ${roleLabel(role).toLowerCase()}`
+        : `Avslo forespørselen fra ${request.name} («${request.username}»)`,
+      { type: 'request', id: request.id }
+    );
     req.session.flash = {
       type: 'success',
       text: approve
-        ? `${request.name} har fått admintilgang som «${request.username}».`
+        ? `${request.name} har fått tilgang som «${request.username}» med rollen ${roleLabel(role).toLowerCase()}.`
         : `Forespørselen fra ${request.name} er avslått.`,
     };
     notifyAccessDecision(request, approve).catch((err) => console.error('Kunne ikke sende svar på tilgangsforespørsel:', err));
@@ -342,6 +393,8 @@ function renderAdminEdit(res, target, { error = null, values = null, status = 20
     values: values || target,
     error,
     adminCount: AdminUsers.count(),
+    adminRoleCount: AdminUsers.countWithRole('admin'),
+    roles: ROLES,
     canEmail: Boolean(config.smtp.host),
   });
 }
@@ -359,10 +412,27 @@ router.post('/administratorer/:id', (req, res) => {
   if (target.id === req.admin.id) return res.redirect('/admin/konto');
 
   const input = profileInput(req.body);
-  const error = profileError(input, target.id);
-  if (error) return renderAdminEdit(res, target, { error, values: input, status: 400 });
+  const role = isRole(req.body.role) ? req.body.role : target.role;
+  let error = profileError(input, target.id);
+  if (!error && target.role === 'admin' && role !== 'admin' && AdminUsers.countWithRole('admin') <= 1) {
+    error = 'Det må finnes minst én med rollen administrator.';
+  }
+  if (error) return renderAdminEdit(res, target, { error, values: { ...input, role }, status: 400 });
 
   AdminUsers.update(target.id, input);
+  audit.byAdmin(req, 'access.account_updated', `Endret kontoopplysningene til «${input.username}»`, {
+    type: 'admin',
+    id: target.id,
+  });
+  if (role !== target.role) {
+    AdminUsers.setRole(target.id, role);
+    audit.byAdmin(
+      req,
+      'access.role_changed',
+      `Endret rollen til «${input.username}» fra ${roleLabel(target.role).toLowerCase()} til ${roleLabel(role).toLowerCase()}`,
+      { type: 'admin', id: target.id }
+    );
+  }
   req.session.flash = { type: 'success', text: `Endringene for «${input.username}» er lagret.` };
   res.redirect('/admin/tilgang');
 });
@@ -375,6 +445,10 @@ router.post('/administratorer/:id/tilbakestill', async (req, res) => {
   const password = temporaryPassword();
   // Logger samtidig ut alle aktive økter for kontoen.
   AdminUsers.setPassword(target.id, bcrypt.hashSync(password, 12), { mustChange: true });
+  audit.byAdmin(req, 'access.password_reset', `Tilbakestilte passordet til «${target.username}»`, {
+    type: 'admin',
+    id: target.id,
+  });
 
   let mailed = false;
   if (req.body.sendEmail && target.email) {
@@ -398,8 +472,11 @@ router.post('/administratorer/:id/fjern', (req, res) => {
     req.session.flash = { type: 'error', text: 'Du kan ikke fjerne din egen tilgang.' };
   } else if (AdminUsers.count() <= 1) {
     req.session.flash = { type: 'error', text: 'Det må finnes minst én administrator.' };
+  } else if (target.role === 'admin' && AdminUsers.countWithRole('admin') <= 1) {
+    req.session.flash = { type: 'error', text: 'Det må finnes minst én med rollen administrator.' };
   } else {
     AdminUsers.delete(id);
+    audit.byAdmin(req, 'access.removed', `Fjernet tilgangen til «${target.username}»`, { type: 'admin', id });
     req.session.flash = { type: 'success', text: `Tilgangen til «${target.username}» er fjernet.` };
   }
   res.redirect('/admin/tilgang');
@@ -433,6 +510,10 @@ router.post('/nytt-passord', (req, res) => {
   if (error) return res.status(400).render('admin/change-password', { error });
 
   changeOwnPassword(req, password);
+  audit.byAdmin(req, 'access.password_changed', `${req.admin.username} valgte nytt passord etter tilbakestilling`, {
+    type: 'admin',
+    id: req.admin.id,
+  });
   req.session.flash = { type: 'success', text: 'Nytt passord er lagret. Velkommen tilbake.' };
   res.redirect('/admin');
 });
@@ -452,6 +533,10 @@ router.post('/konto', (req, res) => {
   const error = profileError(input, req.admin.id);
   if (error) return renderAccount(res, req, { profileError: error, values: input, status: 400 });
   AdminUsers.update(req.admin.id, input);
+  audit.byAdmin(req, 'access.account_updated', `${input.username} endret egne kontoopplysninger`, {
+    type: 'admin',
+    id: req.admin.id,
+  });
   req.session.flash = { type: 'success', text: 'Kontoopplysningene er lagret.' };
   res.redirect('/admin/konto');
 });
@@ -472,8 +557,31 @@ router.post('/konto/passord', (req, res) => {
 
   passwordLimiter.reset(key);
   changeOwnPassword(req, req.body.password);
+  audit.byAdmin(req, 'access.password_changed', `${req.admin.username} byttet passord`, {
+    type: 'admin',
+    id: req.admin.id,
+  });
   req.session.flash = { type: 'success', text: 'Passordet er byttet. Andre enheter der du var innlogget, er logget ut.' };
   res.redirect('/admin/konto');
+});
+
+// --- Revisjonslogg ---
+const AUDIT_PAGE_SIZE = 50;
+
+router.get('/logg', requirePermission('audit.view'), (req, res) => {
+  const category = audit.CATEGORIES[req.query.kategori] ? req.query.kategori : null;
+  const page = Math.max(1, parseInt(req.query.side, 10) || 1);
+  const { rows, total } = audit.list({ category, limit: AUDIT_PAGE_SIZE, offset: (page - 1) * AUDIT_PAGE_SIZE });
+  res.render('admin/audit', {
+    entries: rows,
+    total,
+    page,
+    pages: Math.max(1, Math.ceil(total / AUDIT_PAGE_SIZE)),
+    category,
+    categories: audit.CATEGORIES,
+    retentionMonths: config.auditRetentionMonths,
+    timezone: config.timezone,
+  });
 });
 
 module.exports = router;

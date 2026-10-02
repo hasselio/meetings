@@ -95,8 +95,10 @@
     email.href = `mailto:${encodeURIComponent(p.organizerEmail).replace('%40', '@')}`;
     document.getElementById('dNotesWrap').hidden = !p.notes;
     document.getElementById('dNotes').textContent = p.notes || '';
-    resetCancel();
-    cancelBtn.disabled = event.end < new Date();
+    if (cancelBtn) {
+      resetCancel();
+      cancelBtn.disabled = event.end < new Date();
+    }
     overlay.setAttribute('data-open', '');
     drawer.setAttribute('data-open', '');
     setBackgroundInert(true);
@@ -123,7 +125,8 @@
     if (e.key === 'Escape' && drawer.hasAttribute('data-open')) closeDrawer();
   });
 
-  const resetCancel = UI.confirmButton(cancelBtn, async (_e, reset) => {
+  // Knappen finnes bare for roller som kan endre bookinger.
+  const resetCancel = cancelBtn && UI.confirmButton(cancelBtn, async (_e, reset) => {
     if (!currentEvent) return;
     const event = currentEvent;
     cancelBtn.disabled = true;

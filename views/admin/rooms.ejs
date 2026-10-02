@@ -12,7 +12,7 @@
         <h1 class="title">Rom</h1>
         <p class="lede">Legg til, rediger og fjern møterom. Det du skriver her, ser alle som booker.</p>
       </div>
-      <a class="btn btn-primary" href="/admin/rom/ny"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a>
+      <% if (can('rooms.manage')) { %><a class="btn btn-primary" href="/admin/rom/ny"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a><% } %>
     </div>
 
     <% if (flash) { %>
@@ -27,7 +27,7 @@
           <span class="empty-icon"><%- include('../partials/icon', { name: 'door', size: 22 }) %></span>
           <h2>Ingen rom ennå</h2>
           <p>Legg til det første rommet. Det vises på den offentlige siden med en gang, og kan bookes av alle som har lenken.</p>
-          <a class="btn btn-primary" href="/admin/rom/ny"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a>
+          <% if (can('rooms.manage')) { %><a class="btn btn-primary" href="/admin/rom/ny"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a><% } %>
         </div>
       </section>
     <% } else { %>
@@ -37,7 +37,7 @@
             <div class="request-main">
               <div class="room-admin-name">
                 <span class="room-color" style="--c: <%= room.color %>"></span>
-                <a href="/admin/rom/<%= room.id %>/rediger"><%= room.name %></a>
+                <% if (can('rooms.manage')) { %><a href="/admin/rom/<%= room.id %>/rediger"><%= room.name %></a><% } else { %><%= room.name %><% } %>
               </div>
               <div class="request-meta">
                 <span class="meta-item"><%- include('../partials/icon', { name: 'pin', size: 14 }) %><%= room.location || 'Ingen plassering' %></span>
@@ -51,11 +51,12 @@
                   <% }) %>
                 </ul>
               <% } else { %>
-                <p class="room-admin-hint">Ingen fasiliteter registrert. <a href="/admin/rom/<%= room.id %>/rediger">Legg til</a></p>
+                <p class="room-admin-hint">Ingen fasiliteter registrert.<% if (can('rooms.manage')) { %> <a href="/admin/rom/<%= room.id %>/rediger">Legg til</a><% } %></p>
               <% } %>
             </div>
             <div class="request-actions">
               <a class="btn btn-ghost btn-sm" href="/rom/<%= room.id %>" data-preview aria-label="Vis <%= room.name %> som besøkende"><%- include('../partials/icon', { name: 'monitor', size: 14 }) %>Vis</a>
+              <% if (can('rooms.manage')) { %>
               <a class="btn btn-secondary btn-sm" href="/admin/rom/<%= room.id %>/rediger"><%- include('../partials/icon', { name: 'pencil', size: 14 }) %>Rediger</a>
               <form method="post" action="/admin/rom/<%= room.id %>/slett">
                 <button type="submit" class="btn btn-danger btn-sm" data-confirm
@@ -63,6 +64,7 @@
                   <%- include('../partials/icon', { name: 'trash', size: 14 }) %>Slett
                 </button>
               </form>
+              <% } %>
             </div>
           </li>
         <% }) %>

@@ -20,7 +20,7 @@
           <span class="empty-icon"><%- include('../partials/icon', { name: 'door', size: 22 }) %></span>
           <h2>Ingen rom å vise bookinger for</h2>
           <p>Legg til rom under «Rom». Når et rom finnes, vises kalenderen med bookingene her.</p>
-          <a class="btn btn-primary" href="/admin/rom/ny"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a>
+          <% if (can('rooms.manage')) { %><a class="btn btn-primary" href="/admin/rom/ny"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Nytt rom</a><% } %>
         </div>
       </section>
     <% } else { %>
@@ -46,7 +46,9 @@
             <%- include('../partials/icon', { name: 'monitor', size: 14 }) %>Se som besøkende
           </a>
         </div>
-        <a class="room-bar-link" href="/admin/rom/<%= activeRoom.id %>/rediger">Romdetaljer <%- include('../partials/icon', { name: 'arrow-right', size: 14 }) %></a>
+        <% if (can('rooms.manage')) { %>
+          <a class="room-bar-link" href="/admin/rom/<%= activeRoom.id %>/rediger">Romdetaljer <%- include('../partials/icon', { name: 'arrow-right', size: 14 }) %></a>
+        <% } %>
       </div>
 
       <section class="calendar-card" aria-label="Kalender for <%= activeRoom.name %>">
@@ -70,9 +72,11 @@
         <div id="dNotesWrap"><dt>Notat</dt><dd id="dNotes"></dd></div>
       </dl>
     </div>
+    <% if (can('bookings.manage')) { %>
     <div class="drawer-foot">
       <button type="button" class="btn btn-danger" id="cancelBookingBtn" data-confirm-label="Bekreft avlysning">Avlys møte</button>
     </div>
+    <% } %>
   </aside>
 
   <script src="/js/ui.js" defer></script>

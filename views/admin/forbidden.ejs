@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Ingen tilgang' }) %>
+</head>
+<body>
+  <%- include('../partials/admin-header') %>
+  <main id="innhold" class="container">
+    <div class="not-found">
+      <span class="not-found-code">403</span>
+      <h1 class="title">Du har ikke tilgang til denne siden</h1>
+      <p class="lede">Rollen din er <strong><%= roleLabel(me.role).toLowerCase() %></strong>. Be en administrator om en annen rolle hvis du trenger mer tilgang.</p>
+      <a class="btn btn-primary" href="/admin"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %>Til bookingene</a>
+    </div>
+  </main>
+  <script src="/js/ui.js" defer></script>
+</body>
+</html>

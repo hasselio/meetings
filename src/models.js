@@ -131,11 +131,18 @@ const AdminUsers = {
   findById(id) {
     return db.prepare('SELECT * FROM admin_users WHERE id = ?').get(id);
   },
-  create({ username, passwordHash, name, email }) {
+  create({ username, passwordHash, name, email, role = 'admin' }) {
     const info = db
-      .prepare('INSERT INTO admin_users (username, password_hash, name, email) VALUES (?, ?, ?, ?)')
-      .run(username, passwordHash, name || null, email || null);
+      .prepare('INSERT INTO admin_users (username, password_hash, name, email, role) VALUES (?, ?, ?, ?, ?)')
+      .run(username, passwordHash, name || null, email || null, role);
     return this.findById(info.lastInsertRowid);
+  },
+  setRole(id, role) {
+    db.prepare('UPDATE admin_users SET role = ? WHERE id = ?').run(role, id);
+    return this.findById(id);
+  },
+  countWithRole(role) {
+    return db.prepare('SELECT COUNT(*) AS n FROM admin_users WHERE role = ?').get(role).n;
   },
   update(id, { username, name, email }) {
     db.prepare('UPDATE admin_users SET username = ?, name = ?, email = ? WHERE id = ?').run(
@@ -166,7 +173,7 @@ const AdminUsers = {
   all() {
     return db
       .prepare(
-        'SELECT id, username, name, email, must_change_password, created_at FROM admin_users ORDER BY username COLLATE NOCASE'
+        'SELECT id, username, name, email, role, must_change_password, created_at FROM admin_users ORDER BY username COLLATE NOCASE'
       )
       .all();
   },
@@ -211,7 +218,7 @@ const AdminRequests = {
     return row.n > 0;
   },
   // Passord-hashen slettes fra forespørselen når den er behandlet; den trengs bare til å opprette kontoen.
-  approve: db.transaction((id, adminId) => {
+  approve: db.transaction((id, adminId, role = 'viewer') => {
     const request = AdminRequests.get(id);
     if (!request || request.status !== 'pending') return { error: 'Forespørselen er allerede behandlet.' };
     const clash = db.prepare('SELECT 1 FROM admin_users WHERE lower(username) = lower(?)').get(request.username);
@@ -221,11 +228,12 @@ const AdminRequests = {
       passwordHash: request.password_hash,
       name: request.name,
       email: request.email,
+      role,
     });
     db.prepare(
-      `UPDATE admin_requests SET status = 'approved', password_hash = '', decided_at = datetime('now'), decided_by = ? WHERE id = ?`
-    ).run(adminId, id);
-    return { request };
+      `UPDATE admin_requests SET status = 'approved', role = ?, password_hash = '', decided_at = datetime('now'), decided_by = ? WHERE id = ?`
+    ).run(role, adminId, id);
+    return { request: { ...request, role } };
   }),
   decline: db.transaction((id, adminId) => {
     const request = AdminRequests.get(id);

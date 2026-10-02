@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Revisjonslogg' }) %>
+</head>
+<body>
+  <%- include('../partials/admin-header') %>
+
+  <main id="innhold" class="container">
+    <div class="page-head">
+      <div>
+        <h1 class="title">Revisjonslogg</h1>
+        <p class="lede">Hvem gjorde hva, og når. Oppføringer eldre enn <%= retentionMonths %> måneder slettes automatisk.</p>
+      </div>
+    </div>
+
+    <nav class="segmented audit-filter" aria-label="Filtrer logg">
+      <a href="/admin/logg" <%- !category ? 'aria-current="true"' : '' %>>Alt</a>
+      <% Object.entries(categories).forEach(function ([key, label]) { %>
+        <a href="/admin/logg?kategori=<%= key %>" <%- category === key ? 'aria-current="true"' : '' %>><%= label %></a>
+      <% }) %>
+    </nav>
+
+    <% if (entries.length === 0) { %>
+      <div class="board">
+        <div class="empty-state">
+          <span class="empty-icon"><%- include('../partials/icon', { name: 'check', size: 20 }) %></span>
+          <h2>Ingen hendelser ennå</h2>
+          <p>Endringer i bookinger, rom og tilganger dukker opp her.</p>
+        </div>
+      </div>
+    <% } else { %>
+      <ul class="audit-list">
+        <% entries.forEach(function (e) {
+          const who = e.actor_type === 'admin' ? e.actor_name : e.actor_type === 'visitor' ? (e.actor_name ? e.actor_name + ' (besøkende)' : 'Besøkende') : 'Systemet';
+          const warn = /\.(failed|deleted|removed|cancelled)$/.test(e.action);
+        %>
+          <li class="audit-entry <%= warn ? 'audit-entry-warn' : '' %>">
+            <time class="audit-when" datetime="<%= e.at %>"><%= new Date(e.at).toLocaleString('nb-NO', { timeZone: timezone, dateStyle: 'short', timeStyle: 'short' }) %></time>
+            <span class="audit-summary"><%= e.summary %></span>
+            <span class="audit-meta"><%= who %> · <%= e.action %><% if (e.ip) { %> · <%= e.ip %><% } %></span>
+          </li>
+        <% }) %>
+      </ul>
+      <% const qs = (p) => '/admin/logg?' + (category ? 'kategori=' + category + '&' : '') + 'side=' + p; %>
+      <div class="pager">
+        <span class="tabular"><%= total %> hendelser · side <%= page %> av <%= pages %></span>
+        <span class="request-actions">
+          <% if (page > 1) { %><a class="btn btn-secondary btn-sm" href="<%= qs(page - 1) %>">Nyere</a><% } %>
+          <% if (page < pages) { %><a class="btn btn-secondary btn-sm" href="<%= qs(page + 1) %>">Eldre</a><% } %>
+        </span>
+      </div>
+    <% } %>
+  </main>
+
+  <script src="/js/ui.js" defer></script>
+</body>
+</html>

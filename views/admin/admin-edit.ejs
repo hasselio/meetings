@@ -12,7 +12,7 @@
     <div class="page-head">
       <div>
         <h1 class="title"><%= target.name || target.username %></h1>
-        <p class="lede">Administrator siden <%= new Date(target.created_at.replace(' ', 'T') + 'Z').toLocaleDateString('nb-NO', { dateStyle: 'long' }) %>.
+        <p class="lede"><%= roleLabel(target.role) %> siden <%= new Date(target.created_at.replace(' ', 'T') + 'Z').toLocaleDateString('nb-NO', { dateStyle: 'long' }) %>.
           <% if (target.must_change_password) { %>Må velge nytt passord ved neste innlogging.<% } %></p>
       </div>
     </div>
@@ -36,6 +36,15 @@
         <label for="username">Brukernavn <span class="label-hint">(brukes for å logge inn)</span></label>
         <input class="input" type="text" id="username" name="username" maxlength="40" pattern="[\w.@\-]{3,40}" value="<%= values.username %>" required />
       </div>
+      <fieldset class="field fieldset role-choice">
+        <legend>Rolle</legend>
+        <% Object.entries(roles).forEach(function ([key, role]) { %>
+          <label class="check">
+            <input type="radio" name="role" value="<%= key %>" <%= (values.role || target.role) === key ? 'checked' : '' %> />
+            <span><strong><%= role.label %></strong><span class="check-hint"><%= role.description %></span></span>
+          </label>
+        <% }) %>
+      </fieldset>
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">Lagre endringer</button>
         <a class="btn btn-ghost" href="/admin/tilgang">Avbryt</a>
@@ -66,7 +75,7 @@
 
     <section class="form-card form-card-wide account-section" aria-labelledby="remove-title">
       <h2 class="form-section-title" id="remove-title">Fjern tilgang</h2>
-      <% if (adminCount > 1) { %>
+      <% if (adminCount > 1 && !(target.role === 'admin' && adminRoleCount <= 1)) { %>
         <p class="form-section-note form-section-note-flush">Kontoen slettes, og <%= target.name || target.username %> logges ut med en gang. Rom og bookinger påvirkes ikke.</p>
         <form method="post" action="/admin/administratorer/<%= target.id %>/fjern">
           <div class="form-actions">
@@ -76,7 +85,7 @@
           </div>
         </form>
       <% } else { %>
-        <p class="form-section-note form-section-note-flush">Dette er den eneste administratoren, så tilgangen kan ikke fjernes.</p>
+        <p class="form-section-note form-section-note-flush">Dette er den eneste med rollen administrator, så tilgangen kan ikke fjernes.</p>
       <% } %>
     </section>
   </main>
