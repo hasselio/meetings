@@ -46,6 +46,6 @@ app.use((req, res) => {
   res.status(404).render('public/not-found');
 });
 
-app.listen(config.port, () => {
-  console.log(`Møteromsbooking kjører på http://localhost:${config.port}`);
+app.listen(config.port, config.host, () => {
+  console.log(`Møteromsbooking kjører på http://${config.host}:${config.port}`);
 });

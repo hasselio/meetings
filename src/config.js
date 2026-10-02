@@ -11,6 +11,7 @@ const isTruthy = (value) => (value || '').trim().toLowerCase() === 'true';
 module.exports = {
   appName: process.env.APP_NAME || 'Møterom',
   port: parseInt(process.env.PORT || '3000', 10),
+  host: process.env.HOST || '127.0.0.1',
   baseUrl: process.env.BASE_URL || 'http://localhost:3000',
   timezone: process.env.TIMEZONE || 'Europe/Oslo',
   sessionSecret: process.env.SESSION_SECRET,

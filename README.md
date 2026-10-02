@@ -37,7 +37,7 @@ Bygget med Node.js + Express + SQLite (better-sqlite3) — ingen ekstern databas
    npm start
    ```
 
-   Tjenesten kjører nå på `http://localhost:3000` (eller porten satt i `.env`).
+   Tjenesten kjører nå på `http://127.0.0.1:3000` (eller porten satt i `.env`). Den lytter bare lokalt som standard, siden den er ment å stå bak en reverse proxy. Sett `HOST=0.0.0.0` hvis du vil nå den direkte fra nettverket.
 
 5. Opprett den første administratoren direkte på serveren (passordet tastes inn skjult og lagres kryptert):
 
