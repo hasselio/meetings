@@ -29,6 +29,11 @@
         <ul class="room-rules" aria-label="Regler for booking">
           <% rules.forEach(function (rule) { %><li><%= rule %></li><% }) %>
         </ul>
+        <p class="room-feed">
+          <%- include('../partials/icon', { name: 'calendar', size: 14 }) %>
+          <a href="<%= feedUrl.replace(/^https?:/, 'webcal:') %>">Abonner på ledig/opptatt i din kalender</a>
+          <button type="button" class="link-button" data-copy="<%= feedUrl %>" data-copy-done="Lenken er kopiert. Lim den inn som kalenderabonnement i Outlook eller Google.">Kopier lenke</button>
+        </p>
         <% if (facilityList.length) { %>
           <ul class="facility-chips facility-chips-public" aria-label="Fasiliteter">
             <% facilityList.forEach(function (f) { %>

@@ -427,7 +427,16 @@
     if (widget && widget.reset) widget.reset();
   }
 
-  const initial = defaultRange();
+  // Fra søket på forsiden: ?dato=2030-03-04&fra=10:00&til=11:00
+  const query = new URLSearchParams(location.search);
+  const fromQuery =
+    /^\d{4}-\d{2}-\d{2}$/.test(query.get('dato') || '') &&
+    /^\d{2}:\d{2}$/.test(query.get('fra') || '') &&
+    /^\d{2}:\d{2}$/.test(query.get('til') || '')
+      ? { start: new Date(`${query.get('dato')}T${query.get('fra')}`), end: new Date(`${query.get('dato')}T${query.get('til')}`) }
+      : null;
+  if (fromQuery && fromQuery.end > fromQuery.start) userTouched = true;
+  const initial = userTouched ? fromQuery : defaultRange();
   writeRange(initial.start, initial.end);
   selectFromForm();
 })();

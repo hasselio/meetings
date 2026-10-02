@@ -12,6 +12,7 @@ const Rules = require('../rules');
 const Recurrence = require('../recurrence');
 const Facilities = require('../facilities');
 const time = require('../time');
+const { buildCalendar } = require('../ics');
 const config = require('../config');
 
 const router = express.Router();
@@ -32,8 +33,10 @@ router.get('/', (req, res) => {
     status: roomStatus(r.id, now),
     facilityList: Facilities.describe(r.facilities),
   }));
+  const usedFacilities = new Set(rooms.flatMap((r) => r.facilities));
   res.render('public/home', {
     rooms,
+    facilityFilters: Facilities.FACILITIES.filter((f) => usedFacilities.has(f.key)),
     freeCount: rooms.filter((r) => r.status.free).length,
     today: formatToday(now),
     hours: timelineHours(),
@@ -52,6 +55,7 @@ router.get('/rom/:id', (req, res) => {
     ruleConfig: Rules.rulesOf(room),
     status: roomStatus(room.id),
     timezone: config.timezone,
+    feedUrl: `${config.baseUrl}/rom/${room.id}/kalender.ics`,
     confirmationRequired: config.bookingConfirmation && mailer.canSend(),
     mailEnabled: mailer.canSend(),
     holdMinutes: config.pendingHoldMinutes,
@@ -68,6 +72,49 @@ router.get('/personvern', (req, res) => {
 });
 
 router.get('/api/altcha', bookingChallengeHandler);
+
+// Hvilke rom er ledige i et tidsrom? Tar hensyn til bookinger, sperringer og rommets regler.
+router.get('/api/availability', (req, res) => {
+  const start = new Date(req.query.start);
+  const end = new Date(req.query.end);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start || end - start > 24 * 3600 * 1000) {
+    return res.status(400).json({ error: 'Velg et gyldig tidsrom.' });
+  }
+  const rooms = Rooms.all().map((room) => {
+    const problem = BookingService.slotProblem(room, start, end);
+    return { id: room.id, free: !problem, reason: problem ? problem.error : null };
+  });
+  res.json({ rooms });
+});
+
+// Kalenderabonnement (iCal) per rom: bare opptatt/ledig, aldri hvem som har booket.
+const FEED_PAST_DAYS = 30;
+const FEED_FUTURE_DAYS = 180;
+
+router.get('/rom/:id/kalender.ics', (req, res) => {
+  const room = Rooms.get(req.params.id);
+  if (!room) return res.status(404).type('text/plain').send('Rommet finnes ikke.');
+  const now = Date.now();
+  const from = new Date(now - FEED_PAST_DAYS * 24 * 3600 * 1000).toISOString();
+  const to = new Date(now + FEED_FUTURE_DAYS * 24 * 3600 * 1000).toISOString();
+  const busy = Bookings.forRoomBetween(room.id, from, to).map((b) => ({
+    uid: `opptatt-${b.id}@moterom`,
+    sequence: b.ics_sequence,
+    start: b.start_time,
+    end: b.end_time,
+    summary: 'Opptatt',
+  }));
+  const blocked = RoomBlocks.overlapping(room.id, from, to).map((k) => ({
+    uid: `sperret-${k.id}@moterom`,
+    start: k.start_time,
+    end: k.end_time,
+    summary: 'Ikke tilgjengelig',
+  }));
+  const events = busy.concat(blocked).map((e) => ({ ...e, location: room.location ? `${room.name}, ${room.location}` : room.name }));
+  res.set('Cache-Control', 'public, max-age=300');
+  res.type('text/calendar; charset=utf-8');
+  res.send(buildCalendar({ events, name: `${room.name} (${config.appName})` }));
+});
 
 // Offentlig API: kun ledig/opptatt, ingen detaljer om hvem som har booket
 router.get('/api/rooms/:id/events', (req, res) => {

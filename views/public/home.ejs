@@ -32,6 +32,42 @@
         </div>
       </section>
     <% } else { %>
+      <form class="filters" id="roomFilters" role="search" aria-label="Finn rom" hidden>
+        <div class="filters-row">
+          <label class="filter-search">
+            <span class="sr-only">Søk</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+            <input class="input" type="search" id="filterText" placeholder="Søk etter rom eller sted" autocomplete="off" />
+          </label>
+          <label class="filter-field">
+            <span class="sr-only">Antall personer</span>
+            <select class="input" id="filterCapacity">
+              <option value="">Antall personer</option>
+              <% [2, 4, 6, 8, 12, 20].forEach(function (n) { %><option value="<%= n %>"><%= n %>+ personer</option><% }) %>
+            </select>
+          </label>
+        </div>
+        <fieldset class="filters-row filters-when">
+          <legend class="sr-only">Ledig i tidsrommet</legend>
+          <span class="filters-label">Ledig</span>
+          <input class="input" type="date" id="filterDate" aria-label="Dato" />
+          <input class="input" type="time" id="filterFrom" step="900" aria-label="Fra" />
+          <span class="filters-dash" aria-hidden="true">–</span>
+          <input class="input" type="time" id="filterTo" step="900" aria-label="Til" />
+        </fieldset>
+        <% if (facilityFilters.length) { %>
+          <div class="filters-row filter-chips" role="group" aria-label="Fasiliteter">
+            <% facilityFilters.forEach(function (f) { %>
+              <button type="button" class="chip" data-facility="<%= f.key %>" aria-pressed="false"><%- include('../partials/icon', { name: f.icon, size: 14 }) %><%= f.label %></button>
+            <% }) %>
+          </div>
+        <% } %>
+        <div class="filters-foot">
+          <p class="filters-status" id="filterStatus" aria-live="polite"></p>
+          <button type="button" class="btn btn-ghost btn-sm" id="filterReset" hidden>Nullstill</button>
+        </div>
+      </form>
+
       <section class="board" aria-label="Møterom">
         <div class="board-head" aria-hidden="true">
           <span>Rom</span>
@@ -40,7 +76,11 @@
           <span></span>
         </div>
         <% rooms.forEach(function (room, i) { const s = room.status; %>
-          <a class="room-row" href="/rom/<%= room.id %>" style="--i: <%= i %>">
+          <a class="room-row" href="/rom/<%= room.id %>" style="--i: <%= i %>"
+            data-room-id="<%= room.id %>"
+            data-search="<%= [room.name, room.location, room.description].filter(Boolean).join(' ').toLowerCase() %>"
+            data-capacity="<%= room.capacity || '' %>"
+            data-facilities="<%= room.facilities.join(',') %>">
             <div class="room-row-info">
               <div class="room-row-name"><%= room.name %></div>
               <div class="room-row-meta">
@@ -85,9 +125,15 @@
             <span class="room-row-arrow"><%- include('../partials/icon', { name: 'arrow-right', size: 18 }) %></span>
           </a>
         <% }) %>
+        <div class="empty-state" id="filterEmpty" hidden>
+          <h2>Ingen rom passer</h2>
+          <p>Prøv færre filtre, eller et annet tidspunkt.</p>
+        </div>
       </section>
     <% } %>
   </main>
   <%- include('../partials/public-footer') %>
+  <script src="/js/ui.js" defer></script>
+  <script src="/js/home.js" defer></script>
 </body>
 </html>

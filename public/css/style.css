@@ -2869,3 +2869,130 @@ body > main {
   color: var(--text-2);
   font-size: 13px;
 }
+
+/* ---------- Søk og filter på forsiden ---------- */
+
+.filters {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.filters[hidden],
+.room-row[hidden],
+#filterEmpty[hidden] {
+  display: none;
+}
+
+.filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.filter-search {
+  position: relative;
+  flex: 1 1 260px;
+  color: var(--text-3);
+}
+
+.filter-search svg {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.filter-search .input {
+  padding-left: 36px;
+}
+
+.filter-field {
+  flex: 0 1 200px;
+}
+
+.filters-when .input {
+  width: auto;
+  flex: 0 1 auto;
+}
+
+.filters-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  margin-right: 4px;
+}
+
+.filters-dash {
+  color: var(--text-3);
+}
+
+.filter-chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+}
+
+.filters-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.filters-status {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+@media (max-width: 640px) {
+  .filters-when .input[type='date'] {
+    flex: 1 1 100%;
+  }
+
+  .filters-when .input[type='time'] {
+    flex: 1 1 0;
+  }
+
+  .filter-field {
+    flex: 1 1 100%;
+  }
+}
+
+.room-feed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.room-feed a {
+  color: var(--text-2);
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--text);
+}

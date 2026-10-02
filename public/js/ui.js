@@ -70,6 +70,18 @@ window.UI = (function () {
     return reset;
   }
 
+  // Knapper med data-copy kopierer teksten til utklippstavlen.
+  document.querySelectorAll('[data-copy]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.copy);
+        toast(btn.dataset.copyDone || 'Kopiert.');
+      } catch (_) {
+        window.prompt('Kopier lenken:', btn.dataset.copy);
+      }
+    });
+  });
+
   // Skjemaknapper med data-confirm sendes først inn ved andre klikk.
   document.querySelectorAll('[data-confirm]').forEach((btn) => confirmButton(btn, () => {}));
 
