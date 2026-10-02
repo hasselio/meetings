@@ -1,5 +1,6 @@
 const express = require('express');
-const { Rooms, Bookings, AdminUsers } = require('../models');
+const { Rooms, Bookings } = require('../models');
+const { currentAdmin } = require('../middleware/auth');
 const { sendBookingConfirmation } = require('../services/mailer');
 const { roomStatus, formatToday, timelineHours, parseRange } = require('../availability');
 const Facilities = require('../facilities');
@@ -9,7 +10,7 @@ const router = express.Router();
 
 // Innloggede administratorer får en forhåndsvisningslinje; selve innholdet er det samme som for alle andre.
 router.use((req, res, next) => {
-  res.locals.adminPreview = Boolean(req.session.adminId && AdminUsers.findById(req.session.adminId));
+  res.locals.adminPreview = Boolean(currentAdmin(req));
   next();
 });
 

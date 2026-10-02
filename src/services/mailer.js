@@ -133,4 +133,22 @@ function notifyAccessDecision(request, approved) {
   );
 }
 
-module.exports = { sendBookingConfirmation, sendBookingCancellation, notifyNewAccessRequest, notifyAccessDecision };
+function notifyPasswordReset(admin, temporaryPassword) {
+  return sendText(
+    admin.email,
+    'Passordet ditt er tilbakestilt',
+    `Hei ${admin.name || admin.username},\n\n` +
+      `En administrator har tilbakestilt passordet ditt. Logg inn med brukernavnet «${admin.username}» og dette midlertidige passordet:\n\n` +
+      `${temporaryPassword}\n\n` +
+      `Du blir bedt om å velge et nytt passord med en gang du logger inn:\n${adminUrl('/login')}\n\n` +
+      'Ba du ikke om dette? Ta kontakt med en administrator.\n'
+  );
+}
+
+module.exports = {
+  sendBookingConfirmation,
+  sendBookingCancellation,
+  notifyNewAccessRequest,
+  notifyAccessDecision,
+  notifyPasswordReset,
+};

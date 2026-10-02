@@ -58,10 +58,17 @@ async function main() {
 
   const passwordHash = bcrypt.hashSync(password, 12);
   if (existing) {
+    // Logger også ut alle aktive økter for kontoen.
     AdminUsers.setPassword(existing.id, passwordHash);
-    console.log(`Nytt passord er satt for «${username}».`);
+    console.log(`Nytt passord er satt for «${username}». Eventuelle innlogginger er avsluttet.`);
   } else {
-    AdminUsers.create({ username, passwordHash });
+    const name = (await ask('Navn (valgfritt): ')).trim();
+    const email = (await ask('E-post (valgfritt): ')).trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      console.error('Ugyldig e-postadresse. Kontoen ble ikke opprettet.');
+      process.exit(1);
+    }
+    AdminUsers.create({ username, passwordHash, name, email });
     console.log(`Administrator «${username}» er opprettet. Logg inn på /admin/login.`);
   }
 }

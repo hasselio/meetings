@@ -131,17 +131,44 @@ const AdminUsers = {
   findById(id) {
     return db.prepare('SELECT * FROM admin_users WHERE id = ?').get(id);
   },
-  create({ username, passwordHash }) {
+  create({ username, passwordHash, name, email }) {
     const info = db
-      .prepare('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)')
-      .run(username, passwordHash);
-    return db.prepare('SELECT * FROM admin_users WHERE id = ?').get(info.lastInsertRowid);
+      .prepare('INSERT INTO admin_users (username, password_hash, name, email) VALUES (?, ?, ?, ?)')
+      .run(username, passwordHash, name || null, email || null);
+    return this.findById(info.lastInsertRowid);
   },
-  setPassword(id, passwordHash) {
-    db.prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?').run(passwordHash, id);
+  update(id, { username, name, email }) {
+    db.prepare('UPDATE admin_users SET username = ?, name = ?, email = ? WHERE id = ?').run(
+      username,
+      name || null,
+      email || null,
+      id
+    );
+    return this.findById(id);
+  },
+  // Nytt passord gjør alle eksisterende økter for kontoen ugyldige (session_version økes).
+  setPassword(id, passwordHash, { mustChange = false } = {}) {
+    db.prepare(
+      'UPDATE admin_users SET password_hash = ?, must_change_password = ?, session_version = session_version + 1 WHERE id = ?'
+    ).run(passwordHash, mustChange ? 1 : 0, id);
+    return this.findById(id);
+  },
+  usernameTakenByOther(username, exceptId) {
+    const row = db
+      .prepare(
+        `SELECT
+           (SELECT COUNT(*) FROM admin_users WHERE lower(username) = lower(?) AND id != ?) +
+           (SELECT COUNT(*) FROM admin_requests WHERE status = 'pending' AND lower(username) = lower(?)) AS n`
+      )
+      .get(username, exceptId, username);
+    return row.n > 0;
   },
   all() {
-    return db.prepare('SELECT id, username, created_at FROM admin_users ORDER BY username COLLATE NOCASE').all();
+    return db
+      .prepare(
+        'SELECT id, username, name, email, must_change_password, created_at FROM admin_users ORDER BY username COLLATE NOCASE'
+      )
+      .all();
   },
   delete(id) {
     db.prepare('DELETE FROM admin_users WHERE id = ?').run(id);
@@ -189,7 +216,12 @@ const AdminRequests = {
     if (!request || request.status !== 'pending') return { error: 'Forespørselen er allerede behandlet.' };
     const clash = db.prepare('SELECT 1 FROM admin_users WHERE lower(username) = lower(?)').get(request.username);
     if (clash) return { error: `Brukernavnet «${request.username}» er allerede i bruk. Avslå og be personen søke på nytt.` };
-    AdminUsers.create({ username: request.username, passwordHash: request.password_hash });
+    AdminUsers.create({
+      username: request.username,
+      passwordHash: request.password_hash,
+      name: request.name,
+      email: request.email,
+    });
     db.prepare(
       `UPDATE admin_requests SET status = 'approved', password_hash = '', decided_at = datetime('now'), decided_by = ? WHERE id = ?`
     ).run(adminId, id);

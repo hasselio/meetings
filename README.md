@@ -6,7 +6,8 @@ Enkel møterom-booking-tjeneste for hosting på f.eks. en Raspberry Pi.
 - **Admin-grensesnitt** (`/admin`) med tre faner:
   - **Bookinger:** kalender per rom med full oversikt (hvem, e-post, tittel, notat) og mulighet til å avlyse et møte (sender avlysning på e-post).
   - **Rom:** legg til, rediger og slett rom, med plassering, kapasitet, beskrivelse og fasiliteter (skjerm, Teams-oppsett, tavle, kaffeautomat osv.). Fasilitetene vises med ikon for de som booker. Sletter du et rom med kommende bookinger, får de som booket avlysning på e-post.
-  - **Tilgang:** godkjenn eller avslå nye administratorer.
+  - **Tilgang:** godkjenn eller avslå nye administratorer, og administrer eksisterende kontoer (navn, e-post, brukernavn, tilbakestill passord, fjern tilgang).
+  - **Min konto:** endre egne opplysninger og eget passord.
 - **Se som besøkende:** fra menyen, romlisten, bookingkalenderen og redigeringsskjemaet åpnes den offentlige siden i en modal på samme side. Man kan navigere fritt inne i den, og lukke med «Tilbake til admin», Esc eller klikk utenfor. Innholdet er nøyaktig det besøkende ser, og bookinger gjort i forhåndsvisningen er ekte.
 
 Bygget med Node.js + Express + SQLite (better-sqlite3) — ingen ekstern database eller build-steg nødvendig, passer godt på en Raspberry Pi.
@@ -58,7 +59,11 @@ Bygget med Node.js + Express + SQLite (better-sqlite3) — ingen ekstern databas
 - Det finnes ingen måte å opprette admin fra nettsiden uten godkjenning. Den første administratoren lages med `npm run create-admin`.
 - Andre kan be om tilgang på `/admin/be-om-tilgang` (lenket fra innloggingen). De velger selv brukernavn og passord, og forespørselen havner i kø under **Tilgang** i adminpanelet. Ingen får tilgang før en eksisterende administrator har godkjent.
 - Når forespørselen er behandlet, får personen svar på e-post. Passord-hashen slettes fra forespørselen når den er behandlet.
-- Under **Tilgang** kan administratorer også fjerne andres tilgang. Den som fjernes, logges ut umiddelbart. Man kan ikke fjerne seg selv eller den siste administratoren.
+- Under **Tilgang** kan administratorer også administrere andres kontoer:
+  - Endre navn, e-post og brukernavn.
+  - **Tilbakestille passord:** det lages et midlertidig passord som vises én gang (og kan sendes på e-post hvis SMTP er satt opp). Personen logges ut overalt, og må velge nytt passord ved neste innlogging før noe annet i admin er tilgjengelig.
+  - Fjerne tilgangen. Den som fjernes, logges ut umiddelbart. Man kan ikke fjerne seg selv eller den siste administratoren.
+- Når et passord byttes eller tilbakestilles, blir alle eksisterende innlogginger for kontoen ugyldige. Det gjelder også `npm run create-admin` for en eksisterende bruker.
 - Beskyttelse mot roboter og misbruk:
   - [ALTCHA](https://altcha.org) (proof-of-work, selv-hostet, ingen tredjepart eller sporing, MIT-lisens). Nettleseren løser en liten regneoppgave før skjemaet kan sendes, og hver løsning kan bare brukes én gang.
   - Et skjult «honeypot»-felt som bare roboter fyller ut.

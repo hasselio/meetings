@@ -12,6 +12,9 @@
       <a class="nav-link" href="/" data-preview aria-label="Se som besøkende">
         <%- include('icon', { name: 'monitor', size: 15 }) %> <span class="nav-text">Se som besøkende</span>
       </a>
+      <a class="nav-link" href="/admin/konto" <%- locals.section === 'account' ? 'aria-current="page"' : '' %> aria-label="Min konto">
+        <%- include('icon', { name: 'user', size: 15 }) %> <span class="nav-text">Min konto</span>
+      </a>
       <form method="post" action="/admin/logout">
         <button type="submit" class="nav-link" aria-label="Logg ut">
           <%- include('icon', { name: 'logout', size: 15 }) %> <span class="nav-text">Logg ut</span>

@@ -62,10 +62,21 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_admin_requests_status ON admin_requests(status, created_at);
 `);
 
-// Databaser opprettet før fasiliteter fantes, får kolonnen lagt til ved oppstart.
-const roomColumns = db.prepare('PRAGMA table_info(rooms)').all().map((c) => c.name);
-if (!roomColumns.includes('facilities')) {
-  db.exec(`ALTER TABLE rooms ADD COLUMN facilities TEXT NOT NULL DEFAULT '[]'`);
+// Eldre databaser får nye kolonner lagt til ved oppstart.
+function addMissingColumns(table, columns) {
+  const existing = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  for (const [name, definition] of Object.entries(columns)) {
+    if (!existing.includes(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+  }
 }
+
+addMissingColumns('rooms', { facilities: `TEXT NOT NULL DEFAULT '[]'` });
+addMissingColumns('admin_users', {
+  name: 'TEXT',
+  email: 'TEXT',
+  must_change_password: 'INTEGER NOT NULL DEFAULT 0',
+  // Økes ved passordbytte og tilbakestilling, slik at alle eksisterende økter for kontoen blir ugyldige.
+  session_version: 'INTEGER NOT NULL DEFAULT 0',
+});
 
 module.exports = db;

@@ -10,7 +10,7 @@
     <div class="page-head">
       <div>
         <h1 class="title">Tilgang</h1>
-        <p class="lede">Godkjenn eller avslå forespørsler om admintilgang, og se hvem som har tilgang i dag.</p>
+        <p class="lede">Godkjenn eller avslå forespørsler om admintilgang, og administrer kontoene til de som har tilgang.</p>
       </div>
     </div>
 
@@ -64,17 +64,22 @@
     <section class="section" aria-labelledby="admins-title">
       <h2 class="section-title" id="admins-title">Administratorer <span class="count"><%= admins.length %></span></h2>
       <ul class="request-list">
-        <% admins.forEach(function (a) { %>
+        <% admins.forEach(function (a) { const self = a.id === adminId; %>
           <li class="request request-compact">
             <div class="request-main">
-              <div class="request-name"><%= a.username %><% if (a.id === adminId) { %> <span class="you">deg</span><% } %></div>
-              <div class="request-meta"><span class="tabular">Lagt til <%= new Date(a.created_at.replace(' ', 'T') + 'Z').toLocaleDateString('nb-NO', { timeZone: timezone, dateStyle: 'medium' }) %></span></div>
+              <div class="request-name">
+                <%= a.name || a.username %><% if (self) { %> <span class="you">deg</span><% } %>
+                <% if (a.must_change_password) { %><span class="tag tag-warning">Må velge nytt passord</span><% } %>
+              </div>
+              <div class="request-meta">
+                <span>Brukernavn: <strong><%= a.username %></strong></span>
+                <% if (a.email) { %><a href="mailto:<%= a.email %>"><%= a.email %></a><% } else { %><span class="muted">Ingen e-post</span><% } %>
+                <span class="tabular">Lagt til <%= new Date(a.created_at.replace(' ', 'T') + 'Z').toLocaleDateString('nb-NO', { timeZone: timezone, dateStyle: 'medium' }) %></span>
+              </div>
             </div>
-            <% if (a.id !== adminId && admins.length > 1) { %>
-              <form method="post" action="/admin/administratorer/<%= a.id %>/fjern">
-                <button type="submit" class="btn btn-danger btn-sm" data-confirm data-confirm-label="Bekreft fjerning">Fjern tilgang</button>
-              </form>
-            <% } %>
+            <a class="btn btn-secondary btn-sm" href="<%= self ? '/admin/konto' : '/admin/administratorer/' + a.id %>">
+              <%- include('../partials/icon', { name: 'pencil', size: 14 }) %><%= self ? 'Min konto' : 'Administrer' %>
+            </a>
           </li>
         <% }) %>
       </ul>
