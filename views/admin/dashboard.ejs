@@ -42,8 +42,8 @@
           <% if (activeRoom.capacity) { %>
             <span class="meta-item"><%- include('../partials/icon', { name: 'users', size: 15 }) %><%= activeRoom.capacity %> plasser</span>
           <% } %>
-          <a class="meta-item" href="/rom/<%= activeRoom.id %>" target="_blank" rel="noopener">
-            Offentlig side <%- include('../partials/icon', { name: 'external', size: 14 }) %>
+          <a class="meta-item" href="/rom/<%= activeRoom.id %>" data-preview>
+            <%- include('../partials/icon', { name: 'monitor', size: 14 }) %>Se som besøkende
           </a>
         </div>
         <a class="room-bar-link" href="/admin/rom/<%= activeRoom.id %>/rediger">Romdetaljer <%- include('../partials/icon', { name: 'arrow-right', size: 14 }) %></a>

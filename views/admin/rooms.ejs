@@ -55,7 +55,7 @@
               <% } %>
             </div>
             <div class="request-actions">
-              <a class="btn btn-ghost btn-sm" href="/rom/<%= room.id %>" target="_blank" rel="noopener" aria-label="Vis <%= room.name %> som besøkende (åpnes i ny fane)"><%- include('../partials/icon', { name: 'external', size: 14 }) %>Vis</a>
+              <a class="btn btn-ghost btn-sm" href="/rom/<%= room.id %>" data-preview aria-label="Vis <%= room.name %> som besøkende"><%- include('../partials/icon', { name: 'monitor', size: 14 }) %>Vis</a>
               <a class="btn btn-secondary btn-sm" href="/admin/rom/<%= room.id %>/rediger"><%- include('../partials/icon', { name: 'pencil', size: 14 }) %>Rediger</a>
               <form method="post" action="/admin/rom/<%= room.id %>/slett">
                 <button type="submit" class="btn btn-danger btn-sm" data-confirm

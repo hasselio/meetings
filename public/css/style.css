@@ -1372,6 +1372,149 @@ textarea.input {
   }
 }
 
+/* Inne i forhåndsvisningsmodalen har modalen sin egen topp. */
+.in-frame .preview-bar {
+  display: none;
+}
+
+html:has(.preview-dialog[open]) {
+  overflow: hidden;
+}
+
+.preview-dialog {
+  width: min(1320px, calc(100vw - 48px));
+  height: calc(100dvh - 48px);
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+
+.preview-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+  transform: none;
+  transition: opacity 200ms ease, transform 260ms var(--ease-out);
+}
+
+@starting-style {
+  .preview-dialog[open] {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+
+.preview-dialog::backdrop {
+  background: rgb(20 18 16 / 0.5);
+  opacity: 1;
+  transition: opacity 200ms ease;
+}
+
+@starting-style {
+  .preview-dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+.preview-dialog-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 16px 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.preview-dialog-heading {
+  min-width: 0;
+}
+
+.preview-dialog-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.preview-dialog-title {
+  overflow: hidden;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.preview-dialog-note {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.preview-dialog-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.preview-dialog-body::before {
+  content: 'Laster forhåndsvisning …';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.preview-dialog-body iframe {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--bg);
+  transition: opacity 160ms ease;
+}
+
+.preview-dialog[data-loading] iframe {
+  opacity: 0;
+}
+
+@media (max-width: 640px) {
+  .preview-dialog {
+    width: 100vw;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .preview-dialog-note {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview-dialog[open] {
+    transition: opacity 200ms ease;
+  }
+}
+
 /* ---------- Rom og fasiliteter ---------- */
 
 .facility-chips {

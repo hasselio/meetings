@@ -12,7 +12,7 @@
     <div class="page-head">
       <h1 class="title"><%= room && room.id ? 'Rediger ' + room.name : 'Nytt rom' %></h1>
       <% if (room && room.id) { %>
-        <a class="btn btn-secondary" href="/rom/<%= room.id %>" target="_blank" rel="noopener"><%- include('../partials/icon', { name: 'external', size: 15 }) %>Se som besøkende</a>
+        <a class="btn btn-secondary" href="/rom/<%= room.id %>" data-preview><%- include('../partials/icon', { name: 'monitor', size: 15 }) %>Se som besøkende</a>
       <% } %>
     </div>
 
@@ -38,7 +38,7 @@
       </div>
       <div class="field">
         <label for="description">Beskrivelse <span class="label-hint">(valgfritt, vises for alle som booker)</span></label>
-        <textarea class="input" id="description" name="description" rows="3" maxlength="400" placeholder="Praktisk info, f.eks. hvor nøkkelen henter eller hvordan skjermen slås på"><%= room && room.description ? room.description : '' %></textarea>
+        <textarea class="input" id="description" name="description" rows="3" maxlength="400" placeholder="Praktisk info, f.eks. hvor nøkkelen hentes eller hvordan skjermen slås på"><%= room && room.description ? room.description : '' %></textarea>
       </div>
 
       <div class="form-section"><fieldset class="fieldset">
@@ -80,5 +80,7 @@
       </div>
     </form>
   </main>
+
+  <script src="/js/ui.js" defer></script>
 </body>
 </html>

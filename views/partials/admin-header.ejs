@@ -9,8 +9,8 @@
         Tilgang<% if (locals.pendingCount) { %> <span class="badge" aria-label="<%= pendingCount %> venter"><%= pendingCount %></span><% } %>
       </a>
       <span class="nav-divider" aria-hidden="true"></span>
-      <a class="nav-link" href="/" target="_blank" rel="noopener" aria-label="Se som besøkende (åpnes i ny fane)">
-        <span class="nav-text">Se som besøkende</span> <%- include('icon', { name: 'external', size: 14 }) %>
+      <a class="nav-link" href="/" data-preview aria-label="Se som besøkende">
+        <%- include('icon', { name: 'monitor', size: 15 }) %> <span class="nav-text">Se som besøkende</span>
       </a>
       <form method="post" action="/admin/logout">
         <button type="submit" class="nav-link" aria-label="Logg ut">

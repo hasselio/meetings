@@ -78,6 +78,9 @@
     });
   });
 
+  // En booking gjort i forhåndsvisningen skal vises med en gang modalen lukkes.
+  document.addEventListener('preview:closed', () => calendar.refetchEvents());
+
   function openDrawer(event) {
     currentEvent = event;
     returnFocus = document.activeElement;
