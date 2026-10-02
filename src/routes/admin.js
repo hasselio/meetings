@@ -19,6 +19,7 @@ const Facilities = require('../facilities');
 const Rules = require('../rules');
 const time = require('../time');
 const Recurrence = require('../recurrence');
+const Reports = require('../reports');
 const { bookingFields } = require('../validation');
 const config = require('../config');
 
@@ -154,6 +155,8 @@ router.use((req, res, next) => {
         ? 'rooms'
         : req.path.startsWith('/logg') || req.path.startsWith('/personvern')
           ? 'audit'
+          : req.path.startsWith('/rapporter')
+            ? 'reports'
           : 'bookings';
   res.locals.me = req.admin;
   res.locals.can = (permission) => can(req.admin, permission);
@@ -791,6 +794,93 @@ router.get('/logg', requirePermission('audit.view'), (req, res) => {
     retentionMonths: config.auditRetentionMonths,
     timezone: config.timezone,
   });
+});
+
+// --- Rapporter ---
+const PRESETS = [
+  ['siste-4-uker', 'Siste 4 uker'],
+  ['denne-maned', 'Denne måneden'],
+  ['forrige-maned', 'Forrige måned'],
+  ['3-maneder', 'Siste 3 måneder'],
+];
+
+router.get('/rapporter', requirePermission('reports.view'), (req, res) => {
+  const range = reportRange(req);
+  const report = Reports.utilization(range);
+  const from = Reports.dateKey(range.from);
+  const to = Reports.dateKey(range.to);
+  res.render('admin/reports', {
+    report,
+    presets: PRESETS,
+    preset: range.preset,
+    from,
+    to,
+    query: `fra=${from}&til=${to}`,
+    periodLabel: `${time.formatDate(report.start)} – ${time.formatDate(new Date(new Date(report.end).getTime() - 1))}`,
+    decimal: Reports.decimal,
+  });
+});
+
+const reportRange = (req) => Reports.resolveRange({ preset: req.query.preset, from: req.query.fra, to: req.query.til });
+
+function sendCsv(res, filename, csv) {
+  res.set('Content-Type', 'text/csv; charset=utf-8');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.set('Cache-Control', 'no-store');
+  res.send(csv);
+}
+
+router.get('/rapporter/utnyttelse.csv', requirePermission('reports.export'), (req, res) => {
+  const range = reportRange(req);
+  const { rooms, totals } = Reports.utilization(range);
+  const pct = (n) => Reports.decimal(n * 100);
+  const rows = rooms.map((r) => [
+    r.name,
+    r.bookings,
+    r.cancelled,
+    Reports.decimal(r.bookedHours),
+    Reports.decimal(r.availableHours),
+    pct(r.utilization),
+    Math.round(r.avgMinutes),
+  ]);
+  rows.push(['Totalt', totals.bookings, totals.cancelled, Reports.decimal(totals.bookedHours), Reports.decimal(totals.availableHours), pct(totals.utilization), '']);
+  const name = `utnyttelse_${Reports.dateKey(range.from)}_${Reports.dateKey(range.to)}.csv`;
+  audit.byAdmin(req, 'report.exported', `Eksporterte utnyttelse per rom for ${Reports.dateKey(range.from)}–${Reports.dateKey(range.to)}`);
+  sendCsv(
+    res,
+    name,
+    Reports.toCsv(['Rom', 'Bookinger', 'Avlyst', 'Bookede timer', 'Tilgjengelige timer', 'Utnyttelse (%)', 'Snittlengde (min)'], rows)
+  );
+});
+
+// Inneholder personopplysninger, så eksporten logges.
+router.get('/rapporter/bookinger.csv', requirePermission('reports.export'), (req, res) => {
+  const range = reportRange(req);
+  const { start, end } = Reports.utilization(range);
+  const bookings = Reports.bookingsBetween(start, end);
+  const rows = bookings.map((b) => [
+    time.localDateKey(b.start_time),
+    time.formatTime(b.start_time),
+    time.formatTime(b.end_time),
+    b.room_name,
+    b.title,
+    b.organizer_name,
+    b.organizer_email,
+    b.status === 'cancelled' ? 'Avlyst' : 'Bekreftet',
+    b.series_id ? Recurrence.describe(b.series_rule) || 'Ja' : '',
+    b.admin_username || '',
+  ]);
+  const name = `bookinger_${Reports.dateKey(range.from)}_${Reports.dateKey(range.to)}.csv`;
+  audit.byAdmin(
+    req,
+    'report.exported',
+    `Eksporterte ${bookings.length} bookinger med personopplysninger for ${Reports.dateKey(range.from)}–${Reports.dateKey(range.to)}`
+  );
+  sendCsv(
+    res,
+    name,
+    Reports.toCsv(['Dato', 'Fra', 'Til', 'Rom', 'Tittel', 'Navn', 'E-post', 'Status', 'Gjentas', 'Booket av admin'], rows)
+  );
 });
 
 // --- Innsyn og sletting av personopplysninger (én e-postadresse) ---

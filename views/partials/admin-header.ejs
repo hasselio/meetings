@@ -6,6 +6,9 @@
       <a class="nav-link" href="/admin" <%- locals.section === 'bookings' ? 'aria-current="page"' : '' %>>Bookinger</a>
       <a class="nav-link" href="/admin/rom" <%- locals.section === 'rooms' ? 'aria-current="page"' : '' %>>Rom</a>
       <% const allowed = (p) => Boolean(locals.can && locals.can(p)); %>
+      <% if (allowed('reports.view')) { %>
+        <a class="nav-link" href="/admin/rapporter" <%- locals.section === 'reports' ? 'aria-current="page"' : '' %>>Rapporter</a>
+      <% } %>
       <% if (allowed('access.manage')) { %>
         <a class="nav-link" href="/admin/tilgang" <%- locals.section === 'access' ? 'aria-current="page"' : '' %>>
           Tilgang<% if (locals.pendingCount) { %> <span class="badge" aria-label="<%= pendingCount %> venter"><%= pendingCount %></span><% } %>

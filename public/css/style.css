@@ -2996,3 +2996,191 @@ body > main {
 .link-button:hover {
   color: var(--text);
 }
+
+/* ---------- Rapporter ---------- */
+
+.report-period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.report-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-3);
+}
+
+.report-period-label {
+  margin: 10px 0 20px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stat {
+  display: grid;
+  gap: 2px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.stat-note {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.report-table th,
+.report-table td {
+  padding: 12px 16px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.report-table thead th {
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.report-table tbody tr + tr > * {
+  border-top: 1px solid var(--border);
+}
+
+.report-table tbody th {
+  font-weight: 500;
+}
+
+.report-table tbody th .room-color {
+  display: inline-block;
+  margin: 0 8px 1px 0;
+}
+
+.report-table .num {
+  text-align: right;
+}
+
+.col-meter {
+  width: 40%;
+}
+
+.meter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stat-grid + .section {
+  margin-top: clamp(28px, 4vw, 40px);
+}
+
+.meter {
+  flex: 1;
+  height: 8px;
+  min-width: 80px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  width: var(--w);
+  height: 100%;
+  border-radius: 999px;
+  background: var(--c);
+}
+
+.meter-value {
+  min-width: 44px;
+  text-align: right;
+  font-weight: 500;
+}
+
+.weekday-bars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px;
+  height: 180px;
+  margin: 0;
+  padding: 16px 18px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.weekday-bars li {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+  height: 100%;
+  gap: 4px;
+}
+
+.weekday-bar {
+  align-self: end;
+  width: min(40px, 100%);
+  height: var(--h);
+  min-height: 2px;
+  border-radius: 6px 6px 2px 2px;
+  background: var(--ink);
+  opacity: 0.85;
+}
+
+.weekday-value,
+.weekday-label {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.weekday-label {
+  text-transform: capitalize;
+  color: var(--text-2);
+}
+
+@media (max-width: 760px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

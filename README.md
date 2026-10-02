@@ -1,79 +1,94 @@
 # Møteromsbooking
 
-Enkel møterom-booking-tjeneste for hosting på f.eks. en Raspberry Pi.
+Møteromsbooking for hosting på f.eks. en Raspberry Pi. Eksterne og interne ser ledig/opptatt og booker selv; de som forvalter rommene, har et eget admingrensesnitt.
 
-- **Offentlig grensesnitt** (`/`): eksterne og interne kan se ledig/opptatt per møterom i en kalender, og booke et møte. Booker får en møtebekreftelse på e-post med kalenderinvitasjon (.ics).
-- **Admin-grensesnitt** (`/admin`) med tre faner:
-  - **Bookinger:** kalender per rom med full oversikt (hvem, e-post, tittel, notat) og mulighet til å avlyse et møte (sender avlysning på e-post).
-  - **Rom:** legg til, rediger og slett rom, med plassering, kapasitet, beskrivelse og fasiliteter (skjerm, Teams-oppsett, tavle, kaffeautomat osv.). Fasilitetene vises med ikon for de som booker. Sletter du et rom med kommende bookinger, får de som booket avlysning på e-post.
-  - **Tilgang:** godkjenn eller avslå nye administratorer, og administrer eksisterende kontoer (navn, e-post, brukernavn, tilbakestill passord, fjern tilgang).
-  - **Min konto:** endre egne opplysninger og eget passord.
-- **Se som besøkende:** fra menyen, romlisten, bookingkalenderen og redigeringsskjemaet åpnes den offentlige siden i en modal på samme side. Man kan navigere fritt inne i den, og lukke med «Tilbake til admin», Esc eller klikk utenfor. Innholdet er nøyaktig det besøkende ser, og bookinger gjort i forhåndsvisningen er ekte.
+Bygget med Node.js, Express og SQLite (better-sqlite3). Det trengs ingen ekstern database eller byggesteg, og alt (fonter, kalender, robot-sjekk) er selv-hostet.
 
-Bygget med Node.js + Express + SQLite (better-sqlite3) — ingen ekstern database eller build-steg nødvendig, passer godt på en Raspberry Pi.
+## Funksjoner
 
-## Kom i gang (lokalt / på Raspberry Pi)
+### For de som booker (`/`)
 
-1. Installer Node.js 20 eller nyere (anbefalt: 22 LTS). Versjonen i Raspberry Pi OS sin `apt` er ofte for gammel, så bruk [nvm](https://github.com/nvm-sh/nvm) eller [NodeSource](https://github.com/nodesource/distributions).
-2. Klon/kopier prosjektet til Pi-en, og installer avhengigheter:
+- **Finn rom:** søk på navn og sted, filtrer på antall personer og fasiliteter, og se hvilke rom som er ledige i et bestemt tidsrom. Romsiden fylles ut med tiden man søkte på.
+- **Kalender per rom** med bare ledig/opptatt, og rommets regler (åpningstid, dager, maks varighet osv.).
+- **Booking** av enkeltmøter eller **gjentakende møter** (hver ukedag, hver uke eller annenhver uke, maks 26 møter). Opptatte datoer kan hoppes over.
+- **Bekreftelse på e-post:** bookingen holder av tiden i 30 minutter og gjelder først når den som booket har bekreftet via lenken i e-posten. Det stopper bookinger i andres navn. (Krever SMTP. Uten SMTP gjelder bookingen med en gang.)
+- **Endre eller avbestille via lenken** i e-posten, også enkeltmøter i en serie. Lenken lagres aldri i klartekst, og alle handlinger er knapper (POST), så lenkesjekkere i e-postprogrammer ikke kan bekrefte eller avbestille.
+- **Kalenderinvitasjon** (.ics) med tidssone, oppdateringer ved endring og avlysning ved avbestilling. Serier sendes som én avtale med gjentakelse.
+- **Påminnelse dagen før** møtet, med lenke for å avbestille.
+- **Abonnement på ledig/opptatt** per rom (webcal/iCal) i Outlook, Google eller Apple Kalender. Abonnementet viser aldri hvem som har booket.
+- **Beskyttelse mot misbruk:** robot-sjekk ([ALTCHA](https://altcha.org), selv-hostet), skjult felt for roboter, maks 20 bookinger per IP per time og maks 3 ubekreftede bookinger per e-postadresse.
+- **Personvernerklæring** på `/personvern`, lenket fra bunnen av alle sider.
+
+### For de som forvalter rommene (`/admin`)
+
+- **Bookinger:** kalender per rom med alle detaljer.
+  - Book på vegne av andre med «Ny booking» eller ved å dra over en ledig tid. Serier og valg om å sende invitasjon er med.
+  - Flytt et møte ved å dra eller strekke det. Skjemaet åpnes med den nye tiden, og ingenting lagres før man trykker Lagre.
+  - Endre rom, tid, tittel, navn, e-post og notat.
+  - Avlys ett møte eller hele serien.
+  - Ubekreftede bookinger vises skravert.
+- **Rom:**
+  - Navn, plassering, kapasitet, beskrivelse og fasiliteter.
+  - **Regler per rom:** dager, åpningstid, maks varighet, hvor langt frem man kan booke og pause mellom møter. Administratorer kan booke utenfor reglene, men aldri oppå andre bookinger eller sperringer.
+  - **Sperrede perioder** for ett rom eller alle, f.eks. ved oppussing, med valg om å avlyse bookinger i perioden og varsle de som har booket.
+- **Rapporter:** utnyttelsesgrad per rom (bookede timer delt på åpne timer minus sperringer), antall bookinger, avlysninger og fordeling per ukedag. Utnyttelse og bookinger kan eksporteres som CSV for Excel.
+- **Tilgang og roller:**
+
+  | Rolle | Kan |
+  | --- | --- |
+  | Administrator | Alt, inkludert tilgangsstyring, kontoer, revisjonslogg og sletting av personopplysninger |
+  | Romansvarlig | Bookinger, rom, regler, sperringer, rapporter og CSV-eksport |
+  | Lesetilgang | Se bookinger, rom og rapporter, uten å endre noe |
+
+  Nye brukere ber om tilgang på `/admin/be-om-tilgang`, og rollen velges når forespørselen godkjennes. Kontoer kan få endret opplysninger og rolle, få tilbakestilt passord (må velge nytt ved neste innlogging) eller fjernes.
+- **Revisjonslogg:** hvem som gjorde hva og når: bookinger, rom, sperringer, tilganger, innlogginger og eksport. Loggen kan filtreres.
+- **Innsyn og sletting:** finn alle bookinger for en e-postadresse og slett personopplysningene (kommende møter avlyses først).
+- **Se som besøkende:** viser den offentlige siden i en modal, akkurat slik besøkende ser den.
+- **Lys og mørk modus**, og innlogginger som overlever omstart av tjenesten.
+
+## Kom i gang
+
+1. Installer Node.js 20 eller nyere (anbefalt 22 LTS). Versjonen i Raspberry Pi OS sin `apt` er ofte for gammel, så bruk [nvm](https://github.com/nvm-sh/nvm) eller [NodeSource](https://github.com/nodesource/distributions).
+2. Installer avhengigheter:
 
    ```bash
-   npm install
+   npm ci
    ```
 
-3. Kopier `.env.example` til `.env` og fyll ut:
+3. Kopier `.env.example` til `.env` og fyll ut. Alle innstillinger er forklart i filen. Disse er viktigst:
+   - `SESSION_SECRET` (**påkrevd**): generer med `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`. Lenkene i e-postene (bekreft/endre/avbestille) avledes også fra denne. Bytter du den, slutter eksisterende lenker å virke.
+   - `BASE_URL`: adressen tjenesten nås på. Brukes i lenkene i e-postene og i kalenderabonnementet.
+   - `COOKIE_SECURE=true` bak en HTTPS-proxy. Slår også på `trust proxy`, så grensene per IP gjelder besøkeren og ikke proxyen.
+   - `SMTP_*` og `MAIL_FROM_*`: uten SMTP fungerer alt, men det sendes ingen e-post, og bookinger gjelder da uten bekreftelse (lenken for å endre/avbestille vises på kvitteringen i stedet).
+   - `ADMIN_NOTIFY_EMAIL`: får kopi av invitasjoner og varsel om nye tilgangsforespørsler.
+   - `BOOKING_CONFIRMATION`, `PENDING_HOLD_MINUTES`, `REMINDERS`: e-postbekreftelse, holdetid og påminnelser.
+   - `RETENTION_MONTHS` (standard 6), `AUDIT_RETENTION_MONTHS` (standard 12), `PRIVACY_CONTACT`: oppbevaringstid og kontaktadresse i personvernerklæringen.
 
-   ```bash
-   cp .env.example .env
-   ```
-
-   Viktigst:
-   - `SESSION_SECRET` – **påkrevd**, tjenesten starter ikke uten den. Generer en tilfeldig verdi med f.eks. `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`.
-   - `COOKIE_SECURE` – sett til `true` når tjenesten står bak en TLS-terminerende reverse proxy (se under), slik at innloggingscookien kun sendes over HTTPS. Dette slår også på `trust proxy`, slik at grensene for innloggingsforsøk og tilgangsforespørsler gjelder besøkerens IP og ikke proxyens.
-   - `SMTP_*` og `MAIL_FROM_*` – SMTP-konto som skal sende møtebekreftelser (f.eks. et delt e-postalias, eller en transaksjonsepost-tjeneste). Uten SMTP satt opp vil bookinger fortsatt fungere, men det sendes ingen bekreftelse.
-   - `BASE_URL` – URL-en tjenesten nås på. Brukes i lenkene i e-poster om admintilgang.
-   - `ADMIN_NOTIFY_EMAIL` – får kopi av nye bookinger og varsel når noen ber om admintilgang.
-   - `TIMEZONE` – standard `Europe/Oslo`. Brukes for «ledig til / opptatt til» og dagens tidslinje på forsiden.
-   - `APP_NAME` – navnet som vises i toppen og i fanen (standard `Møterom`).
-
-4. Start tjenesten:
-
-   ```bash
-   npm start
-   ```
-
-   Tjenesten kjører nå på `http://127.0.0.1:3000` (eller porten satt i `.env`). Den lytter bare lokalt som standard, siden den er ment å stå bak en reverse proxy. Sett `HOST=0.0.0.0` hvis du vil nå den direkte fra nettverket.
-
-5. Opprett den første administratoren direkte på serveren (passordet tastes inn skjult og lagres kryptert):
+4. Start tjenesten med `npm start`. Den lytter på `127.0.0.1` og porten i `.env`, og er ment å stå bak en reverse proxy med HTTPS. Robot-sjekken krever HTTPS (eller `localhost`).
+5. Opprett den første administratoren på serveren:
 
    ```bash
    npm run create-admin
    ```
 
-   Samme kommando setter nytt passord hvis brukernavnet finnes fra før, nyttig om noen er låst ute.
+   Samme kommando setter nytt passord hvis brukernavnet finnes fra før.
 
-6. Logg inn på `/admin` og legg til møterom under «Nytt rom».
+## Oppdatere en eksisterende installasjon
 
-## Admintilgang
+Databasen oppgraderes automatisk ved oppstart: nye tabeller og kolonner legges til, og eksisterende administratorer får rollen Administrator. Ta likevel backup først:
 
-- Det finnes ingen måte å opprette admin fra nettsiden uten godkjenning. Den første administratoren lages med `npm run create-admin`.
-- Andre kan be om tilgang på `/admin/be-om-tilgang` (lenket fra innloggingen). De velger selv brukernavn og passord, og forespørselen havner i kø under **Tilgang** i adminpanelet. Ingen får tilgang før en eksisterende administrator har godkjent.
-- Når forespørselen er behandlet, får personen svar på e-post. Passord-hashen slettes fra forespørselen når den er behandlet.
-- Under **Tilgang** kan administratorer også administrere andres kontoer:
-  - Endre navn, e-post og brukernavn.
-  - **Tilbakestille passord:** det lages et midlertidig passord som vises én gang (og kan sendes på e-post hvis SMTP er satt opp). Personen logges ut overalt, og må velge nytt passord ved neste innlogging før noe annet i admin er tilgjengelig.
-  - Fjerne tilgangen. Den som fjernes, logges ut umiddelbart. Man kan ikke fjerne seg selv eller den siste administratoren.
-- Når et passord byttes eller tilbakestilles, blir alle eksisterende innlogginger for kontoen ugyldige. Det gjelder også `npm run create-admin` for en eksisterende bruker.
-- Beskyttelse mot roboter og misbruk:
-  - [ALTCHA](https://altcha.org) (proof-of-work, selv-hostet, ingen tredjepart eller sporing, MIT-lisens). Nettleseren løser en liten regneoppgave før skjemaet kan sendes, og hver løsning kan bare brukes én gang.
-  - Et skjult «honeypot»-felt som bare roboter fyller ut.
-  - Maks 5 forespørsler per IP per time, og maks 50 ubehandlede forespørsler i køen.
-  - Innlogging: etter 8 feil passord for samme brukernavn fra samme IP stenges forsøk i 15 minutter.
-- ALTCHA bruker nettleserens Web Crypto API, som bare er tilgjengelig over HTTPS (eller `localhost`). Skjemaet for å be om tilgang krever derfor at tjenesten nås via HTTPS, se under.
+```bash
+cd /srv/www/meetings/repo                  # eller der prosjektet ligger
+cp data/mettings.db ~/mettings-$(date +%F).db
+git pull
+npm ci --omit=dev
+sudo systemctl restart meetings
+journalctl -u meetings -n 30               # sjekk at den startet
+```
 
-## Kjøre som en systemd-tjeneste på Raspberry Pi
+## Kjøre som systemd-tjeneste
 
-Opprett `/etc/systemd/system/mettings.service`:
+`/etc/systemd/system/meetings.service`:
 
 ```ini
 [Unit]
@@ -83,60 +98,67 @@ After=network.target
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/Mettings
+WorkingDirectory=/srv/www/meetings/repo
 ExecStart=/usr/bin/node src/server.js
 Restart=on-failure
-EnvironmentFile=/home/pi/Mettings/.env
+EnvironmentFile=/srv/www/meetings/repo/.env
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Aktiver og start:
-
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now mettings
-sudo systemctl status mettings
+sudo systemctl enable --now meetings
+journalctl -u meetings -f
 ```
 
-Logger: `journalctl -u mettings -f`
+Påminnelser, opprydding i ubekreftede bookinger, anonymisering og rydding i loggen kjøres av tjenesten selv hvert tiende minutt. Det trengs ingen cron.
 
-## Eksponering til eksterne brukere (HTTPS)
+## HTTPS og eksponering
 
-Siden tjenesten skal deles med eksterne, bør den ikke eksponeres direkte over HTTP. Sett opp en reverse proxy med TLS, f.eks. [Caddy](https://caddyserver.com/) (enkel automatisk HTTPS via Let's Encrypt):
+Sett opp en reverse proxy med TLS, f.eks. nginx med certbot, eller [Caddy](https://caddyserver.com/):
 
 ```
-booking.dittdomene.no {
-  reverse_proxy localhost:3000
+meet.dittdomene.no {
+  reverse_proxy localhost:3200
 }
 ```
 
-Alternativt nginx + certbot. Sørg for at ruteren/brannmuren kun videresender port 443 (og 80 for Let's Encrypt-utfordringen) til Pi-en.
+Videresend bare port 443 (og 80 for Let's Encrypt) til Pi-en.
+
+## Personvern og oppbevaring
+
+- Besøkende ser bare ledig/opptatt. Navn, e-post, tittel og notat ser bare innloggede brukere.
+- Ubekreftede bookinger frigis etter holdetiden og slettes etter et døgn.
+- Navn, e-post, tittel og notat fjernes automatisk `RETENTION_MONTHS` måneder etter møtet. Rom og tidspunkt beholdes, uten noe som peker på personen, så rapportene fortsatt stemmer. Behandlede tilgangsforespørsler slettes etter like lang tid.
+- Revisjonsloggen slettes etter `AUDIT_RETENTION_MONTHS` måneder. Sletting etter ønske logges uten e-postadressen.
+- Den offentlige siden setter ingen informasjonskapsler. Navn/e-post og valgt tema huskes bare i besøkerens egen nettleser.
+- Personvernerklæringen (`views/public/privacy.ejs`) er et utgangspunkt. Tilpass behandlingsgrunnlag og behandlingsansvarlig til virksomheten.
 
 ## Datalagring og backup
 
-All data ligger i `data/mettings.db` (SQLite). Denne filen er ikke sjekket inn i git (se `.gitignore`). Ta backup av denne filen regelmessig, f.eks. med en enkel cron-jobb som kopierer den til et annet sted:
+All data ligger i `data/mettings.db` (SQLite, ikke i git). Ta backup jevnlig, f.eks.:
 
 ```bash
-0 3 * * * cp /home/pi/Mettings/data/mettings.db /home/pi/backup/mettings-$(date +%F).db
+0 3 * * * sqlite3 /srv/www/meetings/repo/data/mettings.db ".backup '/home/pi/backup/mettings-$(date +\%F).db'"
 ```
 
-## Arkitektur / begrensninger i denne MVP-versjonen
+## Utvikling og tester
 
-- Én admin-rolle: alle administratorer har samme rettigheter, også til å godkjenne nye.
-- Grensene for forsøk lagres i minnet og nullstilles ved omstart.
-- Sesjoner lagres i minne — en omstart av tjenesten logger ut admin (uproblematisk for et internt verktøy, men kan byttes til en filbasert sesjonslagring senere om ønskelig).
-- E-postbekreftelse sendes som en ekte kalenderinvitasjon (`METHOD:REQUEST`), slik at booker kan trykke "Godta" og få møtet inn i sin egen kalender. Avlysning sendes som `METHOD:CANCEL`.
-- Overlappende bookinger på samme rom avvises på serversiden.
-- Frontend bruker [FullCalendar](https://fullcalendar.io/) (med norsk lokalisering) og fonten [Geist](https://vercel.com/font), begge selv-hostet under `public/vendor/` — ingen internettilgang er nødvendig når tjenesten kjører.
-- Grensesnittet følger systemets lys/mørk-modus til brukeren velger selv med knappen i toppen. Valget huskes i nettleseren. «Redusert bevegelse» respekteres.
-- Kalender og bookingskjema viser tider i besøkerens lokale tidssone; kalenderinvitasjonen sendes i UTC, så den havner riktig i mottakerens kalender uansett hvor de befinner seg.
+```bash
+npm run dev     # starter med automatisk omstart ved endringer
+npm test        # kjører testene (node:test + supertest, egen database i minnet)
+```
 
-## Videre arbeid (forslag)
+GitHub Actions kjører testene på Node 20 og 22 ved hver push og pull request (`.github/workflows/test.yml`).
 
-- Rollestyring (f.eks. egen rolle som kan godkjenne nye administratorer).
-- Bekreftelse av e-postadresse før en tilgangsforespørsel havner i køen.
-- Redigering av eksisterende bookinger (i dag kan admin kun avlyse).
-- Varsling til internt e-postalias ved nye bookinger (`ADMIN_NOTIFY_EMAIL` i `.env` sender allerede en kopi hvis satt).
-- Eksport av bookinger (CSV) for rapportering.
+## Arkitektur
+
+- `src/services/bookings.js`: all bookinglogikk (regler, sperringer, overlapp, opprettelse, bekreftelse, endring, avlysning), felles for det offentlige skjemaet, lenken i e-posten og admin. Sjekk og lagring skjer i samme databasetransaksjon, så to som booker samtidig ikke kan få samme tid.
+- `src/ics.js`: egen iCalendar-generator med VTIMEZONE, gjentakelse (RRULE/EXDATE/RECURRENCE-ID), riktig escaping og linjebretting.
+- `src/recurrence.js`: forekomster for serier, regnet i lokal tid, så klokkeslettet holder seg over sommertid/vintertid.
+- `src/roles.js` og `src/audit.js`: roller/tillatelser og revisjonslogg.
+- `src/jobs.js` og `src/services/maintenance.js`: jevnlige jobber.
+- Grensene for antall forsøk ligger i minnet og nullstilles ved omstart. Innlogginger lagres i databasen.
+- Frontend bruker [FullCalendar](https://fullcalendar.io/), fonten [Geist](https://vercel.com/font) og [ALTCHA](https://altcha.org), alle selv-hostet under `public/vendor/`.

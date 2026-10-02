@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Rapporter' }) %>
+</head>
+<body>
+  <%- include('../partials/admin-header') %>
+
+  <% const pctLabel = (u) => { const p = u * 100; return (p > 0 && p < 10 ? decimal(p, 1) : Math.round(p)) + ' %'; }; %>
+  <main id="innhold" class="container">
+    <div class="page-head">
+      <div>
+        <h1 class="title">Rapporter</h1>
+        <p class="lede">Hvor mye rommene brukes: bookede timer delt på timene de kunne vært booket (åpningstid på åpne dager, minus sperrede perioder).</p>
+      </div>
+      <% if (can('reports.export')) { %>
+        <div class="request-actions">
+          <a class="btn btn-secondary" href="/admin/rapporter/utnyttelse.csv?<%= query %>" download>Last ned utnyttelse (CSV)</a>
+          <a class="btn btn-secondary" href="/admin/rapporter/bookinger.csv?<%= query %>" download>Last ned bookinger (CSV)</a>
+        </div>
+      <% } %>
+    </div>
+
+    <form class="report-period" method="get" action="/admin/rapporter">
+      <nav class="segmented" aria-label="Periode">
+        <% presets.forEach(function ([key, label]) { %>
+          <a href="/admin/rapporter?preset=<%= key %>" <%- preset === key ? 'aria-current="true"' : '' %>><%= label %></a>
+        <% }) %>
+      </nav>
+      <div class="report-custom">
+        <label class="sr-only" for="fra">Fra dato</label>
+        <input class="input input-sm" type="date" id="fra" name="fra" value="<%= from %>" />
+        <span aria-hidden="true">–</span>
+        <label class="sr-only" for="til">Til dato</label>
+        <input class="input input-sm" type="date" id="til" name="til" value="<%= to %>" />
+        <button type="submit" class="btn btn-secondary btn-sm">Vis</button>
+      </div>
+    </form>
+    <p class="report-period-label"><%= periodLabel %></p>
+
+    <div class="stat-grid">
+      <div class="stat">
+        <span class="stat-label">Utnyttelse</span>
+        <span class="stat-value tabular"><%= pctLabel(report.totals.utilization) %></span>
+        <span class="stat-note">alle rom samlet</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Bookede timer</span>
+        <span class="stat-value tabular"><%= decimal(report.totals.bookedHours, report.totals.bookedHours < 10 ? 1 : 0) %></span>
+        <span class="stat-note">av <%= decimal(report.totals.availableHours, 0) %> mulige</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Bookinger</span>
+        <span class="stat-value tabular"><%= report.totals.bookings %></span>
+        <span class="stat-note">bekreftede møter</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Avlyst</span>
+        <span class="stat-value tabular"><%= report.totals.cancelled %></span>
+        <span class="stat-note"><%= report.totals.bookings + report.totals.cancelled ? Math.round(report.totals.cancelled / (report.totals.bookings + report.totals.cancelled) * 100) : 0 %> % av alle</span>
+      </div>
+    </div>
+
+    <section class="section" aria-labelledby="per-room-title">
+      <h2 class="section-title" id="per-room-title">Per rom</h2>
+      <% if (!report.rooms.length) { %>
+        <p class="muted">Ingen rom er lagt inn.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th scope="col">Rom</th>
+                <th scope="col" class="col-meter">Utnyttelse</th>
+                <th scope="col" class="num">Timer</th>
+                <th scope="col" class="num">Bookinger</th>
+                <th scope="col" class="num">Snitt</th>
+                <th scope="col" class="num">Avlyst</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% report.rooms.forEach(function (r) { const pct = Math.round(r.utilization * 100); %>
+                <tr>
+                  <th scope="row"><span class="room-color" style="--c: <%= r.color %>"></span><%= r.name %></th>
+                  <td class="col-meter">
+                    <div class="meter-row">
+                      <div class="meter" aria-hidden="true"><span style="--w: <%= Math.min(pct, 100) %>%; --c: <%= r.color %>"></span></div>
+                      <span class="meter-value tabular"><%= pctLabel(r.utilization) %></span>
+                    </div>
+                  </td>
+                  <td class="num tabular"><%= decimal(r.bookedHours) %> <span class="muted">/ <%= decimal(r.availableHours, 0) %></span></td>
+                  <td class="num tabular"><%= r.bookings %></td>
+                  <td class="num tabular"><%= r.bookings ? Math.round(r.avgMinutes) + ' min' : '–' %></td>
+                  <td class="num tabular"><%= r.cancelled %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="section" aria-labelledby="weekday-title">
+      <h2 class="section-title" id="weekday-title">Bookede timer per ukedag</h2>
+      <% const maxHours = Math.max(1, ...report.weekdays.map(function (w) { return w.hours; })); %>
+      <ul class="weekday-bars">
+        <% report.weekdays.forEach(function (w) { %>
+          <li>
+            <span class="weekday-value tabular"><%= decimal(w.hours, w.hours && w.hours < 10 ? 1 : 0) %> t</span>
+            <span class="weekday-bar" style="--h: <%= (w.hours / maxHours * 100).toFixed(1) %>%" aria-hidden="true"></span>
+            <span class="weekday-label"><%= w.label %></span>
+          </li>
+        <% }) %>
+      </ul>
+    </section>
+  </main>
+
+  <script src="/js/ui.js" defer></script>
+</body>
+</html>

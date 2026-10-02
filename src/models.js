@@ -401,4 +401,10 @@ const AdminRequests = {
   }),
 };
 
+// Bookinger fra før lenkene i e-posten fantes, får lenke ved oppstart, så påminnelser og
+// oppdateringer til dem også kan inneholde en lenke som virker.
+for (const b of db.prepare('SELECT id, ics_uid, series_id FROM bookings WHERE manage_token_hash IS NULL AND anonymized_at IS NULL').all()) {
+  db.prepare('UPDATE bookings SET manage_token_hash = ? WHERE id = ?').run(hashToken(manageToken(b)), b.id);
+}
+
 module.exports = { Rooms, Bookings, RoomBlocks, AdminUsers, AdminRequests };
