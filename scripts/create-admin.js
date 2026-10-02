@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Oppretter en administrator direkte i databasen, eller setter nytt passord for en som finnes.
+// Oppretter en plattformadministrator direkte i databasen, eller setter nytt passord for en som finnes.
+// Plattformadministratorer oppretter bedrifter og deres administratorer i nettleseren (/admin/plattform).
 // Bruk på serveren: npm run create-admin
 const readline = require('readline');
 const bcrypt = require('bcryptjs');
@@ -61,6 +62,13 @@ async function main() {
     // Logger også ut alle aktive økter for kontoen.
     AdminUsers.setPassword(existing.id, passwordHash);
     console.log(`Nytt passord er satt for «${username}». Eventuelle innlogginger er avsluttet.`);
+    if (!existing.is_platform_admin) {
+      const promote = (await ask('Gjøre kontoen til plattformadministrator (tilgang til alle bedrifter)? (j/n): ')).trim().toLowerCase();
+      if (promote === 'j' || promote === 'ja') {
+        AdminUsers.setPlatformAdmin(existing.id, true);
+        console.log(`«${username}» er nå plattformadministrator.`);
+      }
+    }
   } else {
     const name = (await ask('Navn (valgfritt): ')).trim();
     const email = (await ask('E-post (valgfritt): ')).trim();
@@ -68,8 +76,8 @@ async function main() {
       console.error('Ugyldig e-postadresse. Kontoen ble ikke opprettet.');
       process.exit(1);
     }
-    AdminUsers.create({ username, passwordHash, name, email });
-    console.log(`Administrator «${username}» er opprettet. Logg inn på /admin/login.`);
+    AdminUsers.create({ username, passwordHash, name, email, isPlatformAdmin: true });
+    console.log(`Plattformadministrator «${username}» er opprettet. Logg inn på /admin/login og opprett bedrifter under «Plattform».`);
   }
 }
 

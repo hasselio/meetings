@@ -26,34 +26,61 @@ const roomParams = (r) => ({
   buffer_minutes: r.buffer_minutes || 0,
 });
 
+// Rommet kommer alltid med bedriften det tilhører, så navnet kan vises i e-post og på romsiden.
+const ROOM_SELECT = `SELECT r.*, o.name AS organization_name, o.slug AS organization_slug, o.active AS organization_active
+  FROM rooms r LEFT JOIN organizations o ON o.id = r.organization_id`;
+
 const Rooms = {
-  all() {
-    return db.prepare('SELECT * FROM rooms ORDER BY name COLLATE NOCASE').all().map(withFacilities);
+  // Alle rom i én bedrift (admin), eller alle rom når orgId mangler (jobber og plattform).
+  all(orgId = null) {
+    const where = orgId ? 'WHERE r.organization_id = ?' : '';
+    return db
+      .prepare(`${ROOM_SELECT} ${where} ORDER BY r.name COLLATE NOCASE`)
+      .all(...(orgId ? [orgId] : []))
+      .map(withFacilities);
   },
-  allWithUpcoming(nowIso) {
+  // Rom som vises offentlig: bare fra aktive bedrifter.
+  publicAll(orgId = null) {
+    return db
+      .prepare(
+        `${ROOM_SELECT} WHERE o.active = 1 ${orgId ? 'AND o.id = ?' : ''} ORDER BY o.name COLLATE NOCASE, r.name COLLATE NOCASE`
+      )
+      .all(...(orgId ? [orgId] : []))
+      .map(withFacilities);
+  },
+  publicGet(id) {
+    return withFacilities(db.prepare(`${ROOM_SELECT} WHERE r.id = ? AND o.active = 1`).get(id));
+  },
+  allWithUpcoming(nowIso, orgId) {
     return db
       .prepare(
         `SELECT r.*, (SELECT COUNT(*) FROM bookings b
                       WHERE b.room_id = r.id AND ${ACTIVE_B} AND b.end_time > ?) AS upcoming
-         FROM rooms r ORDER BY r.name COLLATE NOCASE`
+         FROM rooms r WHERE r.organization_id = ? ORDER BY r.name COLLATE NOCASE`
       )
-      .all(nowIso)
+      .all(nowIso, orgId)
       .map(withFacilities);
   },
   get(id) {
-    return withFacilities(db.prepare('SELECT * FROM rooms WHERE id = ?').get(id));
+    return withFacilities(db.prepare(`${ROOM_SELECT} WHERE r.id = ?`).get(id));
+  },
+  // Rommet bare hvis det tilhører bedriften. Alle oppslag fra admin går hit.
+  getInOrg(id, orgId) {
+    return withFacilities(db.prepare(`${ROOM_SELECT} WHERE r.id = ? AND r.organization_id = ?`).get(id, orgId));
   },
   create(input) {
+    if (!input.organization_id) throw new Error('Et rom må tilhøre en bedrift.');
     const info = db
       .prepare(
-        `INSERT INTO rooms (name, location, capacity, description, color, facilities,
+        `INSERT INTO rooms (organization_id, name, location, capacity, description, color, facilities,
            open_from, open_to, open_days, max_duration_minutes, max_days_ahead, buffer_minutes)
-         VALUES (@name, @location, @capacity, @description, @color, @facilities,
+         VALUES (@organization_id, @name, @location, @capacity, @description, @color, @facilities,
            @open_from, @open_to, @open_days, @max_duration_minutes, @max_days_ahead, @buffer_minutes)`
       )
-      .run(roomParams(input));
+      .run({ ...roomParams(input), organization_id: input.organization_id });
     return this.get(info.lastInsertRowid);
   },
+  // Bedriften et rom tilhører, kan ikke endres her.
   update(id, input) {
     db.prepare(
       `UPDATE rooms SET name = @name, location = @location, capacity = @capacity, description = @description,
@@ -65,6 +92,9 @@ const Rooms = {
   },
   delete(id) {
     db.prepare('DELETE FROM rooms WHERE id = ?').run(id);
+  },
+  countInOrg(orgId) {
+    return db.prepare('SELECT COUNT(*) AS n FROM rooms WHERE organization_id = ?').get(orgId).n;
   },
 };
 
@@ -92,6 +122,20 @@ const Bookings = {
   },
   get(id) {
     return db.prepare('SELECT * FROM bookings WHERE id = ?').get(id);
+  },
+  // Bookingen bare hvis rommet tilhører bedriften.
+  getInOrg(id, orgId) {
+    return db
+      .prepare('SELECT b.* FROM bookings b JOIN rooms r ON r.id = b.room_id WHERE b.id = ? AND r.organization_id = ?')
+      .get(id, orgId);
+  },
+  bySeriesInOrg(seriesId, orgId) {
+    return db
+      .prepare(
+        `SELECT b.* FROM bookings b JOIN rooms r ON r.id = b.room_id
+         WHERE b.series_id = ? AND r.organization_id = ? ORDER BY b.start_time`
+      )
+      .all(seriesId, orgId);
   },
   // Alle bookinger som hører til samme lenke (én booking eller en hel serie).
   byTokenHash(hash) {
@@ -235,16 +279,21 @@ const Bookings = {
   anonymizeEndedBefore(iso) {
     return this.anonymize('end_time < ?', iso);
   },
-  findByEmail(email) {
+  // Innsyn og sletting gjøres per bedrift: hver bedrift svarer for bookingene i sine rom.
+  findByEmail(email, orgId) {
     return db
       .prepare(
         `SELECT b.*, r.name AS room_name FROM bookings b JOIN rooms r ON r.id = b.room_id
-         WHERE lower(b.organizer_email) = lower(?) ORDER BY b.start_time DESC`
+         WHERE lower(b.organizer_email) = lower(?) AND r.organization_id = ? ORDER BY b.start_time DESC`
       )
-      .all(email);
+      .all(email, orgId);
   },
-  anonymizeByEmail(email) {
-    return this.anonymize('lower(organizer_email) = lower(?)', email);
+  anonymizeByEmail(email, orgId) {
+    return this.anonymize(
+      'lower(organizer_email) = lower(?) AND room_id IN (SELECT id FROM rooms WHERE organization_id = ?)',
+      email,
+      orgId
+    );
   },
 };
 
@@ -257,14 +306,19 @@ const RoomBlocks = {
       .prepare('SELECT * FROM room_blocks WHERE room_id = ? AND start_time < ? AND end_time > ? ORDER BY start_time')
       .all(roomId, end, start);
   },
-  upcoming(nowIso) {
+  getInOrg(id, orgId) {
+    return db
+      .prepare('SELECT k.* FROM room_blocks k JOIN rooms r ON r.id = k.room_id WHERE k.id = ? AND r.organization_id = ?')
+      .get(id, orgId);
+  },
+  upcoming(nowIso, orgId) {
     return db
       .prepare(
         `SELECT k.*, r.name AS room_name, a.username AS created_by_username FROM room_blocks k
          JOIN rooms r ON r.id = k.room_id LEFT JOIN admin_users a ON a.id = k.created_by
-         WHERE k.end_time > ? ORDER BY k.start_time`
+         WHERE k.end_time > ? AND r.organization_id = ? ORDER BY k.start_time`
       )
-      .all(nowIso);
+      .all(nowIso, orgId);
   },
   create({ roomId, start, end, reason, createdBy }) {
     const info = db
@@ -277,28 +331,126 @@ const RoomBlocks = {
   },
 };
 
+const Organizations = {
+  all() {
+    return db
+      .prepare(
+        `SELECT o.*,
+           (SELECT COUNT(*) FROM rooms r WHERE r.organization_id = o.id) AS room_count,
+           (SELECT COUNT(*) FROM memberships m WHERE m.organization_id = o.id) AS member_count,
+           (SELECT COUNT(*) FROM admin_requests q WHERE q.organization_id = o.id AND q.status = 'pending') AS pending_count
+         FROM organizations o ORDER BY o.name COLLATE NOCASE`
+      )
+      .all();
+  },
+  active() {
+    return db.prepare('SELECT * FROM organizations WHERE active = 1 ORDER BY name COLLATE NOCASE').all();
+  },
+  get(id) {
+    return db.prepare('SELECT * FROM organizations WHERE id = ?').get(id);
+  },
+  bySlug(slug) {
+    return db.prepare('SELECT * FROM organizations WHERE slug = ?').get(String(slug || '').toLowerCase());
+  },
+  slugTaken(slug, exceptId = 0) {
+    return Boolean(db.prepare('SELECT 1 FROM organizations WHERE slug = ? AND id != ?').get(slug, exceptId));
+  },
+  create({ name, slug }) {
+    const info = db.prepare('INSERT INTO organizations (name, slug) VALUES (?, ?)').run(name, slug);
+    return this.get(info.lastInsertRowid);
+  },
+  update(id, { name, slug, active }) {
+    db.prepare('UPDATE organizations SET name = ?, slug = ?, active = ? WHERE id = ?').run(name, slug, active ? 1 : 0, id);
+    return this.get(id);
+  },
+  // Bare tomme bedrifter kan slettes; ellers deaktiveres de.
+  delete(id) {
+    db.prepare('DELETE FROM organizations WHERE id = ?').run(id);
+  },
+};
+
+const Memberships = {
+  // Bedriftene brukeren tilhører, med rollen i hver.
+  forUser(userId) {
+    return db
+      .prepare(
+        `SELECT m.role, m.organization_id, o.name, o.slug, o.active FROM memberships m
+         JOIN organizations o ON o.id = m.organization_id
+         WHERE m.user_id = ? ORDER BY o.name COLLATE NOCASE`
+      )
+      .all(userId);
+  },
+  get(userId, orgId) {
+    return db.prepare('SELECT * FROM memberships WHERE user_id = ? AND organization_id = ?').get(userId, orgId);
+  },
+  // Medlemmene i en bedrift, og hvor mange andre bedrifter hver av dem også er med i.
+  forOrg(orgId) {
+    return db
+      .prepare(
+        `SELECT u.id, u.username, u.name, u.email, u.must_change_password, u.is_platform_admin, u.created_at,
+           m.role, m.created_at AS member_since,
+           (SELECT COUNT(*) FROM memberships x WHERE x.user_id = u.id AND x.organization_id != m.organization_id) AS other_orgs
+         FROM memberships m JOIN admin_users u ON u.id = m.user_id
+         WHERE m.organization_id = ? ORDER BY u.username COLLATE NOCASE`
+      )
+      .all(orgId);
+  },
+  add(userId, orgId, role) {
+    db.prepare('INSERT OR REPLACE INTO memberships (user_id, organization_id, role) VALUES (?, ?, ?)').run(userId, orgId, role);
+  },
+  setRole(userId, orgId, role) {
+    db.prepare('UPDATE memberships SET role = ? WHERE user_id = ? AND organization_id = ?').run(role, userId, orgId);
+  },
+  remove(userId, orgId) {
+    db.prepare('DELETE FROM memberships WHERE user_id = ? AND organization_id = ?').run(userId, orgId);
+  },
+  countAdmins(orgId) {
+    return db.prepare(`SELECT COUNT(*) AS n FROM memberships WHERE organization_id = ? AND role = 'admin'`).get(orgId).n;
+  },
+  count(userId) {
+    return db.prepare('SELECT COUNT(*) AS n FROM memberships WHERE user_id = ?').get(userId).n;
+  },
+  // E-post til bedriftens administratorer, f.eks. ved nye søknader.
+  adminEmails(orgId) {
+    return db
+      .prepare(
+        `SELECT u.email FROM memberships m JOIN admin_users u ON u.id = m.user_id
+         WHERE m.organization_id = ? AND m.role = 'admin' AND u.email IS NOT NULL AND u.email != ''`
+      )
+      .all(orgId)
+      .map((r) => r.email);
+  },
+};
+
 const AdminUsers = {
   count() {
     return db.prepare('SELECT COUNT(*) AS n FROM admin_users').get().n;
   },
   findByUsername(username) {
-    return db.prepare('SELECT * FROM admin_users WHERE username = ?').get(username);
+    return db.prepare('SELECT * FROM admin_users WHERE lower(username) = lower(?)').get(username);
   },
   findById(id) {
     return db.prepare('SELECT * FROM admin_users WHERE id = ?').get(id);
   },
-  create({ username, passwordHash, name, email, role = 'admin' }) {
+  create({ username, passwordHash, name, email, isPlatformAdmin = false, mustChangePassword = false }) {
     const info = db
-      .prepare('INSERT INTO admin_users (username, password_hash, name, email, role) VALUES (?, ?, ?, ?, ?)')
-      .run(username, passwordHash, name || null, email || null, role);
+      .prepare(
+        'INSERT INTO admin_users (username, password_hash, name, email, is_platform_admin, must_change_password) VALUES (?, ?, ?, ?, ?, ?)'
+      )
+      .run(username, passwordHash, name || null, email || null, isPlatformAdmin ? 1 : 0, mustChangePassword ? 1 : 0);
     return this.findById(info.lastInsertRowid);
   },
-  setRole(id, role) {
-    db.prepare('UPDATE admin_users SET role = ? WHERE id = ?').run(role, id);
+  setPlatformAdmin(id, value) {
+    db.prepare('UPDATE admin_users SET is_platform_admin = ? WHERE id = ?').run(value ? 1 : 0, id);
     return this.findById(id);
   },
-  countWithRole(role) {
-    return db.prepare('SELECT COUNT(*) AS n FROM admin_users WHERE role = ?').get(role).n;
+  platformAdmins() {
+    return db
+      .prepare('SELECT id, username, name, email, created_at FROM admin_users WHERE is_platform_admin = 1 ORDER BY username COLLATE NOCASE')
+      .all();
+  },
+  countPlatformAdmins() {
+    return db.prepare('SELECT COUNT(*) AS n FROM admin_users WHERE is_platform_admin = 1').get().n;
   },
   update(id, { username, name, email }) {
     db.prepare('UPDATE admin_users SET username = ?, name = ?, email = ? WHERE id = ?').run(
@@ -316,22 +468,16 @@ const AdminUsers = {
     ).run(passwordHash, mustChange ? 1 : 0, id);
     return this.findById(id);
   },
-  usernameTakenByOther(username, exceptId) {
+  // Brukernavn er unike på tvers av bedrifter, også mot søknader som venter.
+  usernameTakenByOther(username, exceptId = 0) {
     const row = db
       .prepare(
         `SELECT
            (SELECT COUNT(*) FROM admin_users WHERE lower(username) = lower(?) AND id != ?) +
-           (SELECT COUNT(*) FROM admin_requests WHERE status = 'pending' AND lower(username) = lower(?)) AS n`
+           (SELECT COUNT(*) FROM admin_requests WHERE status = 'pending' AND user_id IS NULL AND lower(username) = lower(?)) AS n`
       )
       .get(username, exceptId, username);
     return row.n > 0;
-  },
-  all() {
-    return db
-      .prepare(
-        'SELECT id, username, name, email, role, must_change_password, created_at FROM admin_users ORDER BY username COLLATE NOCASE'
-      )
-      .all();
   },
   delete(id) {
     db.prepare('DELETE FROM admin_users WHERE id = ?').run(id);
@@ -339,61 +485,75 @@ const AdminUsers = {
 };
 
 const AdminRequests = {
-  create({ name, email, username, passwordHash, reason }) {
+  create({ organizationId, userId = null, name, email, username, passwordHash = '', reason }) {
     const info = db
-      .prepare('INSERT INTO admin_requests (name, email, username, password_hash, reason) VALUES (?, ?, ?, ?, ?)')
-      .run(name, email, username, passwordHash, reason || null);
+      .prepare(
+        `INSERT INTO admin_requests (organization_id, user_id, name, email, username, password_hash, reason)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(organizationId, userId, name, email, username, passwordHash, reason || null);
     return this.get(info.lastInsertRowid);
   },
   get(id) {
     return db.prepare('SELECT * FROM admin_requests WHERE id = ?').get(id);
   },
-  pending() {
-    return db.prepare(`SELECT * FROM admin_requests WHERE status = 'pending' ORDER BY created_at`).all();
+  pending(orgId) {
+    return db
+      .prepare(`SELECT * FROM admin_requests WHERE status = 'pending' AND organization_id = ? ORDER BY created_at`)
+      .all(orgId);
   },
-  countPending() {
-    return db.prepare(`SELECT COUNT(*) AS n FROM admin_requests WHERE status = 'pending'`).get().n;
+  countPending(orgId) {
+    return db
+      .prepare(`SELECT COUNT(*) AS n FROM admin_requests WHERE status = 'pending' AND organization_id = ?`)
+      .get(orgId).n;
   },
-  recentDecisions(limit = 10) {
+  // En innlogget bruker kan ha bare én ventende søknad per bedrift.
+  pendingForUser(userId, orgId) {
+    return db
+      .prepare(`SELECT * FROM admin_requests WHERE status = 'pending' AND user_id = ? AND organization_id = ?`)
+      .get(userId, orgId);
+  },
+  recentDecisions(orgId, limit = 10) {
     return db
       .prepare(
         `SELECT r.id, r.name, r.email, r.username, r.status, r.decided_at, a.username AS decided_by_username
          FROM admin_requests r LEFT JOIN admin_users a ON a.id = r.decided_by
-         WHERE r.status != 'pending' ORDER BY r.decided_at DESC LIMIT ?`
+         WHERE r.status != 'pending' AND r.organization_id = ? ORDER BY r.decided_at DESC LIMIT ?`
       )
-      .all(limit);
+      .all(orgId, limit);
   },
   usernameTaken(username) {
-    const row = db
-      .prepare(
-        `SELECT
-           (SELECT COUNT(*) FROM admin_users WHERE lower(username) = lower(?)) +
-           (SELECT COUNT(*) FROM admin_requests WHERE status = 'pending' AND lower(username) = lower(?)) AS n`
-      )
-      .get(username, username);
-    return row.n > 0;
+    return AdminUsers.usernameTakenByOther(username, 0);
   },
-  // Passord-hashen slettes fra forespørselen når den er behandlet; den trengs bare til å opprette kontoen.
-  approve: db.transaction((id, adminId, role = 'viewer') => {
+  // Søknaden må tilhøre bedriften som behandler den. Passord-hashen slettes når den er behandlet.
+  approve: db.transaction((id, orgId, adminId, role = 'viewer') => {
     const request = AdminRequests.get(id);
-    if (!request || request.status !== 'pending') return { error: 'Forespørselen er allerede behandlet.' };
-    const clash = db.prepare('SELECT 1 FROM admin_users WHERE lower(username) = lower(?)').get(request.username);
-    if (clash) return { error: `Brukernavnet «${request.username}» er allerede i bruk. Avslå og be personen søke på nytt.` };
-    AdminUsers.create({
-      username: request.username,
-      passwordHash: request.password_hash,
-      name: request.name,
-      email: request.email,
-      role,
-    });
+    if (!request || request.organization_id !== orgId) return { error: 'Fant ikke forespørselen.' };
+    if (request.status !== 'pending') return { error: 'Forespørselen er allerede behandlet.' };
+
+    let userId = request.user_id;
+    if (userId) {
+      if (!AdminUsers.findById(userId)) return { error: 'Kontoen som søkte, finnes ikke lenger.' };
+    } else {
+      const clash = AdminUsers.findByUsername(request.username);
+      if (clash) return { error: `Brukernavnet «${request.username}» er allerede i bruk. Avslå og be personen søke på nytt.` };
+      userId = AdminUsers.create({
+        username: request.username,
+        passwordHash: request.password_hash,
+        name: request.name,
+        email: request.email,
+      }).id;
+    }
+    Memberships.add(userId, orgId, role);
     db.prepare(
       `UPDATE admin_requests SET status = 'approved', role = ?, password_hash = '', decided_at = datetime('now'), decided_by = ? WHERE id = ?`
     ).run(role, adminId, id);
-    return { request: { ...request, role } };
+    return { request: { ...request, role }, userId };
   }),
-  decline: db.transaction((id, adminId) => {
+  decline: db.transaction((id, orgId, adminId) => {
     const request = AdminRequests.get(id);
-    if (!request || request.status !== 'pending') return { error: 'Forespørselen er allerede behandlet.' };
+    if (!request || request.organization_id !== orgId) return { error: 'Fant ikke forespørselen.' };
+    if (request.status !== 'pending') return { error: 'Forespørselen er allerede behandlet.' };
     db.prepare(
       `UPDATE admin_requests SET status = 'declined', password_hash = '', decided_at = datetime('now'), decided_by = ? WHERE id = ?`
     ).run(adminId, id);
@@ -407,4 +567,4 @@ for (const b of db.prepare('SELECT id, ics_uid, series_id FROM bookings WHERE ma
   db.prepare('UPDATE bookings SET manage_token_hash = ? WHERE id = ?').run(hashToken(manageToken(b)), b.id);
 }
 
-module.exports = { Rooms, Bookings, RoomBlocks, AdminUsers, AdminRequests };
+module.exports = { Rooms, Bookings, RoomBlocks, Organizations, Memberships, AdminUsers, AdminRequests };

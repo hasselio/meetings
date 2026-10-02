@@ -63,8 +63,10 @@ function slotProblem(room, start, end, { excludeIds = [], bypassRules = false, n
 
 const needsConfirmation = (actor) => actor.type === 'visitor' && config.bookingConfirmation && mailer.canSend();
 
+// Hendelsen føres i loggen til bedriften som eier rommet.
 function logFor(actor, action, summary, booking) {
-  const target = { type: 'booking', id: booking.id };
+  const room = Rooms.get(booking.room_id);
+  const target = { type: 'booking', id: booking.id, orgId: room ? room.organization_id : null };
   if (actor.type === 'admin') audit.byAdmin(actor.req, action, summary, target);
   else audit.byVisitor(actor.req, action, summary, target, booking.organizer_name);
 }

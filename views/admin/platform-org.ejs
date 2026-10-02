@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Rediger ' + target.name }) %>
+</head>
+<body>
+  <%- include('../partials/admin-header') %>
+
+  <main id="innhold" class="container">
+    <a class="back-link" href="/admin/plattform"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %>Bedrifter</a>
+
+    <div class="page-head">
+      <div>
+        <h1 class="title"><%= target.name %></h1>
+        <p class="lede"><%= target.room_count %> rom · <%= target.member_count %> bruker<%= target.member_count === 1 ? '' : 'e' %> · opprettet <%= new Date(target.created_at.replace(' ', 'T') + 'Z').toLocaleDateString('nb-NO', { dateStyle: 'long' }) %></p>
+      </div>
+      <form method="post" action="/admin/plattform/bedrifter/<%= target.id %>/administrer">
+        <button type="submit" class="btn btn-secondary">Administrer brukere og rom <%- include('../partials/icon', { name: 'arrow-right', size: 15 }) %></button>
+      </form>
+    </div>
+
+    <% if (flash) { %>
+      <div class="alert <%= flash.type === 'error' ? 'alert-error' : 'alert-success' %> form-card-wide" role="status">
+        <%- include('../partials/icon', { name: flash.type === 'error' ? 'alert' : 'check', size: 16 }) %><span><%= flash.text %></span>
+      </div>
+    <% } %>
+
+    <form class="form-card form-card-wide" method="post" action="/admin/plattform/bedrifter/<%= target.id %>">
+      <h2 class="form-section-title">Om bedriften</h2>
+      <% if (error) { %>
+        <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= error %></span></div>
+      <% } %>
+      <div class="field-row">
+        <div class="field">
+          <label for="orgName">Navn</label>
+          <input class="input" type="text" id="orgName" name="name" maxlength="80" value="<%= values.name %>" required />
+        </div>
+        <div class="field">
+          <label for="orgSlug">Adresse</label>
+          <div class="input-prefix">
+            <span>/b/</span>
+            <input class="input" type="text" id="orgSlug" name="slug" maxlength="40" pattern="[a-z0-9\-]{1,40}" value="<%= values.slug %>" required />
+          </div>
+        </div>
+      </div>
+      <label class="check">
+        <input type="checkbox" name="active" value="1" <%= values.active ? 'checked' : '' %> />
+        <span><strong>Aktiv</strong><span class="check-hint">Er bedriften deaktivert, er rommene skjult for besøkende og kan ikke bookes, og brukerne kan ikke logge inn. Ingenting slettes.</span></span>
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Lagre endringer</button>
+        <a class="btn btn-ghost" href="/admin/plattform">Avbryt</a>
+      </div>
+    </form>
+
+    <section class="form-card form-card-wide account-section" aria-labelledby="members-title">
+      <h2 class="form-section-title" id="members-title">Brukere</h2>
+      <% if (!members.length) { %>
+        <p class="form-section-note form-section-note-flush">Ingen brukere ennå. Gå inn i bedriften med «Administrer brukere og rom» for å opprette den første administratoren.</p>
+      <% } else { %>
+        <ul class="membership-list">
+          <% members.forEach(function (m) { %>
+            <li><span><%= m.name || m.username %> <span class="muted">(<%= m.username %>)</span></span><span class="tag tag-role tag-role-<%= m.role %>"><%= roleLabel(m.role) %></span></li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+
+    <section class="form-card form-card-wide account-section" aria-labelledby="delete-title">
+      <h2 class="form-section-title" id="delete-title">Slett bedriften</h2>
+      <% if (target.room_count > 0) { %>
+        <p class="form-section-note form-section-note-flush">Bedriften har <%= target.room_count %> rom med bookinghistorikk. Deaktiver den i stedet, eller slett rommene først.</p>
+      <% } else { %>
+        <p class="form-section-note form-section-note-flush">Bedriften har ingen rom. Søknader og medlemskap slettes, og brukere som ikke er med i noen annen bedrift, slettes også.</p>
+        <form method="post" action="/admin/plattform/bedrifter/<%= target.id %>/slett">
+          <div class="form-actions">
+            <button type="submit" class="btn btn-danger" data-confirm data-confirm-label="Bekreft sletting"><%- include('../partials/icon', { name: 'trash', size: 15 }) %>Slett bedriften</button>
+          </div>
+        </form>
+      <% } %>
+    </section>
+  </main>
+
+  <script src="/js/ui.js" defer></script>
+</body>
+</html>

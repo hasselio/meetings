@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
-const { db, models, createAdmin, login, createRoom, PASSWORD } = require('./helpers');
+const { db, models, createAdmin, login, createRoom, testOrg, PASSWORD } = require('./helpers');
 
 const auditActions = () => db.prepare('SELECT action FROM audit_log ORDER BY id').all().map((r) => r.action);
 
@@ -32,7 +32,7 @@ test('romansvarlig kan endre rom, men ikke tilgangsstyring eller logg', async ()
   const created = await agent.post('/admin/rom').type('form').send({ name: 'Styrerommet', open_days: ['1', '2'] });
   assert.equal(created.status, 302);
   assert.equal((await agent.get('/admin/tilgang')).status, 403);
-  assert.equal((await agent.get('/admin/administratorer/1')).status, 403);
+  assert.equal((await agent.get('/admin/brukere/1')).status, 403);
   assert.equal((await agent.get('/admin/logg')).status, 403);
 
   const page = await agent.get('/admin/rom');
@@ -43,7 +43,9 @@ test('romansvarlig kan endre rom, men ikke tilgangsstyring eller logg', async ()
 test('godkjenning gir valgt rolle og logges', async () => {
   createAdmin('sjef');
   const agent = await login('sjef');
+  const roleIn = (username) => models.Memberships.get(models.AdminUsers.findByUsername(username).id, testOrg().id).role;
   const request = models.AdminRequests.create({
+    organizationId: testOrg().id,
     name: 'Per Søker',
     email: 'per@example.com',
     username: 'per',
@@ -53,11 +55,12 @@ test('godkjenning gir valgt rolle og logges', async () => {
 
   const res = await agent.post(`/admin/tilgang/${request.id}/godkjenn`).type('form').send({ role: 'manager' });
   assert.equal(res.status, 302);
-  assert.equal(models.AdminUsers.findByUsername('per').role, 'manager');
+  assert.equal(roleIn('per'), 'manager');
   assert.ok(auditActions().includes('access.approved'));
 
   // Ugyldig rolle faller tilbake til lesetilgang.
   const second = models.AdminRequests.create({
+    organizationId: testOrg().id,
     name: 'Kari Søker',
     email: 'kari@example.com',
     username: 'karis',
@@ -65,7 +68,7 @@ test('godkjenning gir valgt rolle og logges', async () => {
     passwordHash: bcrypt.hashSync(PASSWORD, 4),
   });
   await agent.post(`/admin/tilgang/${second.id}/godkjenn`).type('form').send({ role: 'superuser' });
-  assert.equal(models.AdminUsers.findByUsername('karis').role, 'viewer');
+  assert.equal(roleIn('karis'), 'viewer');
 });
 
 test('administrator kan endre rollen til en annen, men ikke sin egen', async () => {
@@ -74,25 +77,25 @@ test('administrator kan endre rollen til en annen, men ikke sin egen', async () 
   const agent = await login('sjef2');
 
   let res = await agent
-    .post(`/admin/administratorer/${target.id}`)
+    .post(`/admin/brukere/${target.id}`)
     .type('form')
     .send({ username: 'maal', name: '', email: '', role: 'viewer' });
   assert.equal(res.status, 302);
-  assert.equal(models.AdminUsers.findById(target.id).role, 'viewer');
+  assert.equal(models.Memberships.get(target.id, testOrg().id).role, 'viewer');
   assert.ok(auditActions().includes('access.role_changed'));
 
   // Egen konto har ikke rollefelt; et forfalsket felt ignoreres.
   res = await agent.post('/admin/konto').type('form').send({ username: 'sjef2', role: 'viewer' });
   assert.equal(res.status, 302);
-  assert.equal(models.AdminUsers.findById(chief.id).role, 'admin');
+  assert.equal(models.Memberships.get(chief.id, testOrg().id).role, 'admin');
 
   // Den nedgraderte mister tilgangen med en gang, også i en økt som allerede er åpen.
   const targetAgent = await login('maal');
   assert.equal((await targetAgent.get('/admin/tilgang')).status, 403);
 });
 
-test('innlogging og mislykkede forsøk havner i loggen, og loggsiden viser dem', async () => {
-  createAdmin('logger');
+test('innlogging og mislykkede forsøk havner i plattformloggen', async () => {
+  createAdmin('logger', 'admin', { platform: true });
   const bad = await require('supertest')
     .agent(require('../src/app'))
     .post('/admin/login')
@@ -105,7 +108,7 @@ test('innlogging og mislykkede forsøk havner i loggen, og loggsiden viser dem',
   assert.ok(actions.includes('login.failed'));
   assert.ok(actions.includes('login.success'));
 
-  const page = await agent.get('/admin/logg?kategori=login');
+  const page = await agent.get('/admin/plattform/logg?kategori=login');
   assert.equal(page.status, 200);
   assert.match(page.text, /Mislykket innlogging som «logger»/);
   assert.doesNotMatch(page.text, /La til rommet/);

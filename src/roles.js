@@ -1,7 +1,9 @@
+// Rollene gjelder innenfor én bedrift. Plattformadministratorer (admin_users.is_platform_admin)
+// står over bedriftene og har rollen administrator i alle.
 const ROLES = {
   admin: {
     label: 'Administrator',
-    description: 'Alt, inkludert tilgangsstyring, kontoer og revisjonslogg.',
+    description: 'Alt i bedriften, inkludert brukere, revisjonslogg og sletting av personopplysninger.',
   },
   manager: {
     label: 'Romansvarlig',
@@ -25,7 +27,13 @@ const PERMISSIONS = {
 };
 
 const isRole = (role) => Object.prototype.hasOwnProperty.call(ROLES, role);
-const can = (user, permission) => Boolean(user && (PERMISSIONS[permission] || []).includes(user.role));
+
+// user.role er rollen i den aktive bedriften (settes av requireAdmin).
+function can(user, permission) {
+  if (!user) return false;
+  if (permission === 'platform.manage') return Boolean(user.is_platform_admin);
+  return (PERMISSIONS[permission] || []).includes(user.role);
+}
 const roleLabel = (role) => (ROLES[role] ? ROLES[role].label : role);
 
 function requirePermission(permission) {

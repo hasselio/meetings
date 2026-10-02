@@ -7,6 +7,8 @@
   const rows = Array.from(document.querySelectorAll('.room-row'));
   const text = document.getElementById('filterText');
   const capacity = document.getElementById('filterCapacity');
+  // Finnes bare når flere bedrifter har rom.
+  const orgSelect = document.getElementById('filterOrg');
   const date = document.getElementById('filterDate');
   const from = document.getElementById('filterFrom');
   const to = document.getElementById('filterTo');
@@ -32,6 +34,7 @@
   function apply() {
     const q = text.value.trim().toLowerCase();
     const minCapacity = Number(capacity.value) || 0;
+    const orgId = orgSelect ? orgSelect.value : '';
     const facilities = selectedFacilities();
     const range = timeRange();
     let shown = 0;
@@ -42,6 +45,7 @@
       const slot = availability && availability.get(row.dataset.roomId);
       const visible =
         (!q || row.dataset.search.includes(q)) &&
+        (!orgId || row.dataset.org === orgId) &&
         (!minCapacity || cap >= minCapacity) &&
         facilities.every((f) => roomFacilities.includes(f)) &&
         (!availability || (slot && slot.free));
@@ -55,7 +59,7 @@
       );
     });
 
-    const filtered = Boolean(q || minCapacity || facilities.length || date.value || from.value || to.value);
+    const filtered = Boolean(q || orgId || minCapacity || facilities.length || date.value || from.value || to.value);
     reset.hidden = !filtered;
     empty.hidden = shown > 0;
     if (!filtered) status.textContent = '';
@@ -91,6 +95,7 @@
 
   text.addEventListener('input', apply);
   capacity.addEventListener('change', apply);
+  if (orgSelect) orgSelect.addEventListener('change', apply);
   chips.forEach((chip) =>
     chip.addEventListener('click', () => {
       chip.setAttribute('aria-pressed', String(chip.getAttribute('aria-pressed') !== 'true'));

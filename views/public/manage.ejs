@@ -17,7 +17,7 @@
         <p class="eyebrow"><%= isSeries ? 'Gjentakende møte' : 'Din booking' %></p>
         <h1 class="title"><%= first.title %></h1>
         <p class="lede">
-          <% if (room) { %><%= room.name %><% if (room.location) { %>, <%= room.location %><% } %> · <% } %>booket av <%= first.organizer_name %>
+          <% if (room) { %><%= room.name %><% if (room.location) { %>, <%= room.location %><% } %> hos <%= room.organization_name %> · <% } %>booket av <%= first.organizer_name %>
         </p>
       </div>
     </div>

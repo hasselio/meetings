@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <%- include('../partials/head', { title: 'Plattform' }) %>
+</head>
+<body>
+  <%- include('../partials/admin-header') %>
+
+  <main id="innhold" class="container">
+    <%- include('../partials/platform-tabs', { current: 'orgs' }) %>
+    <div class="page-head">
+      <div>
+        <h1 class="title">Bedrifter</h1>
+        <p class="lede">Hver bedrift har sine egne rom og sin egen brukergruppe, og kan ikke se eller endre andres. Herfra oppretter du bedrifter, utnevner deres første administrator og går inn i en bedrift for å hjelpe til.</p>
+      </div>
+    </div>
+
+    <% if (flash) { %>
+      <div class="alert <%= flash.type === 'error' ? 'alert-error' : 'alert-success' %>" role="status">
+        <%- include('../partials/icon', { name: flash.type === 'error' ? 'alert' : 'check', size: 16 }) %><span><%= flash.text %></span>
+      </div>
+    <% } %>
+
+    <% if (!organizations.length) { %>
+      <section class="board">
+        <div class="empty-state">
+          <span class="empty-icon"><%- include('../partials/icon', { name: 'building', size: 22 }) %></span>
+          <h2>Ingen bedrifter ennå</h2>
+          <p>Opprett den første bedriften under. Deretter kan dens administrator legge inn rom og brukere.</p>
+        </div>
+      </section>
+    <% } else { %>
+      <ul class="request-list" aria-label="Bedrifter">
+        <% organizations.forEach(function (o) { %>
+          <li class="request request-compact">
+            <div class="request-main">
+              <div class="request-name">
+                <%= o.name %>
+                <% if (!o.active) { %><span class="tag tag-warning">Deaktivert</span><% } %>
+                <% if (org && o.id === org.id) { %><span class="you">valgt</span><% } %>
+              </div>
+              <div class="request-meta">
+                <a href="/b/<%= o.slug %>" data-preview>/b/<%= o.slug %></a>
+                <span><%= o.room_count %> rom</span>
+                <span><%= o.member_count %> bruker<%= o.member_count === 1 ? '' : 'e' %></span>
+                <% if (o.pending_count) { %><span class="tag tag-warning"><%= o.pending_count %> venter på godkjenning</span><% } %>
+              </div>
+            </div>
+            <div class="request-actions">
+              <a class="btn btn-ghost btn-sm" href="/admin/plattform/bedrifter/<%= o.id %>"><%- include('../partials/icon', { name: 'pencil', size: 14 }) %>Rediger</a>
+              <form method="post" action="/admin/plattform/bedrifter/<%= o.id %>/administrer">
+                <button type="submit" class="btn btn-secondary btn-sm">Administrer <%- include('../partials/icon', { name: 'arrow-right', size: 14 }) %></button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+
+    <section class="section" aria-labelledby="new-org-title">
+      <form class="form-card form-card-wide" method="post" action="/admin/plattform/bedrifter">
+        <h2 class="form-section-title" id="new-org-title">Ny bedrift</h2>
+        <% if (error) { %>
+          <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= error %></span></div>
+        <% } %>
+        <div class="field-row">
+          <div class="field">
+            <label for="orgName">Navn</label>
+            <input class="input" type="text" id="orgName" name="name" maxlength="80" value="<%= values.name || '' %>" placeholder="F.eks. Acme AS" required />
+          </div>
+          <div class="field">
+            <label for="orgSlug">Adresse <span class="label-hint">(valgfri, lages fra navnet)</span></label>
+            <div class="input-prefix">
+              <span>/b/</span>
+              <input class="input" type="text" id="orgSlug" name="slug" maxlength="40" pattern="[a-z0-9\-]{1,40}" value="<%= values.slug || '' %>" placeholder="acme-as" />
+            </div>
+          </div>
+        </div>
+
+        <h3 class="form-subtitle">Første administrator <span class="label-hint">(valgfritt)</span></h3>
+        <p class="form-section-note form-section-note-flush">Skriv et nytt brukernavn for å opprette en konto med midlertidig passord, eller brukernavnet til en eksisterende bruker.</p>
+        <div class="field-row">
+          <div class="field">
+            <label for="adminName">Navn</label>
+            <input class="input" type="text" id="adminName" name="adminName" maxlength="80" value="<%= values.adminName || '' %>" />
+          </div>
+          <div class="field">
+            <label for="adminEmail">E-post</label>
+            <input class="input" type="email" id="adminEmail" name="adminEmail" maxlength="120" value="<%= values.adminEmail || '' %>" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="adminUsername">Brukernavn</label>
+          <input class="input" type="text" id="adminUsername" name="adminUsername" maxlength="40" pattern="[\w.@\-]{3,40}" value="<%= values.adminUsername || '' %>" />
+        </div>
+        <% if (canEmail) { %>
+          <label class="check">
+            <input type="checkbox" name="sendEmail" value="1" />
+            <span>Send det midlertidige passordet på e-post</span>
+          </label>
+        <% } %>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary"><%- include('../partials/icon', { name: 'plus', size: 15 }) %>Opprett bedrift</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="section" aria-labelledby="platform-admins-title">
+      <h2 class="section-title" id="platform-admins-title">Plattformadministratorer <span class="count"><%= platformAdmins.length %></span></h2>
+      <p class="section-note"><%- include('../partials/icon', { name: 'shield', size: 14 }) %>Har tilgang til alle bedrifter. Hold denne gruppen liten.</p>
+      <ul class="request-list">
+        <% platformAdmins.forEach(function (a) { const self = a.id === adminId; %>
+          <li class="request request-compact">
+            <div class="request-main">
+              <div class="request-name"><%= a.name || a.username %><% if (self) { %> <span class="you">deg</span><% } %></div>
+              <div class="request-meta">
+                <span>Brukernavn: <strong><%= a.username %></strong></span>
+                <% if (a.email) { %><a href="mailto:<%= a.email %>"><%= a.email %></a><% } %>
+              </div>
+            </div>
+            <% if (!self && platformAdmins.length > 1) { %>
+              <form method="post" action="/admin/plattform/administratorer/<%= a.id %>/fjern">
+                <button type="submit" class="btn btn-secondary btn-sm" data-confirm data-confirm-label="Bekreft fjerning">Fjern plattformtilgang</button>
+              </form>
+            <% } %>
+          </li>
+        <% }) %>
+      </ul>
+      <form class="inline-form" method="post" action="/admin/plattform/administratorer">
+        <label class="sr-only" for="grantUsername">Brukernavn</label>
+        <input class="input" type="text" id="grantUsername" name="username" maxlength="40" placeholder="Brukernavn" required />
+        <button type="submit" class="btn btn-secondary" data-confirm data-confirm-label="Bekreft: gi tilgang til alt">Gjør til plattformadministrator</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="/js/ui.js" defer></script>
+</body>
+</html>

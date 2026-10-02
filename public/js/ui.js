@@ -70,6 +70,11 @@ window.UI = (function () {
     return reset;
   }
 
+  // Nedtrekkslister med data-autosubmit sender skjemaet med en gang et valg er gjort (f.eks. bedriftsvelgeren).
+  document.querySelectorAll('select[data-autosubmit]').forEach((select) => {
+    select.addEventListener('change', () => select.form.requestSubmit());
+  });
+
   // Knapper med data-copy kopierer teksten til utklippstavlen.
   document.querySelectorAll('[data-copy]').forEach((btn) => {
     btn.addEventListener('click', async () => {

@@ -10,7 +10,7 @@
     <div class="page-head">
       <div>
         <h1 class="title">Min konto</h1>
-        <p class="lede">Innlogget som <strong><%= me.username %></strong> med rollen <strong><%= roleLabel(me.role).toLowerCase() %></strong>.</p>
+        <p class="lede">Innlogget som <strong><%= me.username %></strong><% if (me.is_platform_admin) { %>, plattformadministrator<% } %>.</p>
       </div>
     </div>
 
@@ -43,6 +43,46 @@
         <button type="submit" class="btn btn-primary">Lagre</button>
       </div>
     </form>
+
+    <section class="form-card form-card-wide account-section" aria-labelledby="orgs-title">
+      <h2 class="form-section-title" id="orgs-title">Bedrifter</h2>
+      <% if (me.is_platform_admin) { %>
+        <p class="form-section-note form-section-note-flush">Du er plattformadministrator og har tilgang til alle bedrifter. Velg bedrift i linjen øverst.</p>
+      <% } %>
+      <% if (memberships.length) { %>
+        <ul class="membership-list">
+          <% memberships.forEach(function (m) { %>
+            <li>
+              <span><%= m.name %><% if (!m.active) { %> <span class="tag tag-warning">Deaktivert</span><% } %></span>
+              <span class="tag tag-role tag-role-<%= m.role %>"><%= roleLabel(m.role) %></span>
+            </li>
+          <% }) %>
+        </ul>
+      <% } else if (!me.is_platform_admin) { %>
+        <p class="muted">Du er ikke med i noen bedrift.</p>
+      <% } %>
+      <% if (joinable.length) { %>
+        <form method="post" action="/admin/konto/bedrifter" class="join-form">
+          <h3 class="form-subtitle">Be om tilgang til en bedrift til</h3>
+          <% if (joinError) { %>
+            <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= joinError %></span></div>
+          <% } %>
+          <div class="field">
+            <label for="joinOrg">Bedrift</label>
+            <select class="input" id="joinOrg" name="organization" required>
+              <% joinable.forEach(function (o) { %><option value="<%= o.id %>"><%= o.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="joinReason">Begrunnelse <span class="label-hint">(valgfritt)</span></label>
+            <input class="input" type="text" id="joinReason" name="reason" maxlength="500" />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-secondary">Send forespørsel</button>
+          </div>
+        </form>
+      <% } %>
+    </section>
 
     <form class="form-card form-card-wide account-section" method="post" action="/admin/konto/passord">
       <h2 class="form-section-title">Bytt passord</h2>

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="nb">
 <head>
-  <%- include('../partials/head', { title: 'Ledige rom' }) %>
+  <%- include('../partials/head', { title: org ? org.name : 'Ledige rom', description: org ? 'Se ledige møterom hos ' + org.name + ' og book direkte.' : undefined }) %>
 </head>
 <body>
   <%- include('../partials/public-header') %>
@@ -10,16 +10,17 @@
     <div class="page-head">
       <div>
         <p class="eyebrow"><%= today.charAt(0).toUpperCase() + today.slice(1) %></p>
-        <h1 class="display">Finn et ledig rom</h1>
+        <h1 class="display"><%= org ? org.name : 'Finn et ledig rom' %></h1>
         <p class="lede">
           <% if (rooms.length === 0) { %>
-            Det er ikke lagt inn noen møterom ennå.
+            <%= org ? org.name + ' har ikke lagt inn noen møterom ennå.' : 'Det er ikke lagt inn noen møterom ennå.' %>
           <% } else if (freeCount === rooms.length) { %>
             Alle <%= rooms.length %> rom er ledige akkurat nå. Velg et rom for å se uka og booke.
           <% } else { %>
             <%= freeCount %> av <%= rooms.length %> rom er ledige akkurat nå. Velg et rom for å se uka og booke.
           <% } %>
         </p>
+        <% if (org) { %><p class="org-back"><a href="/">Se rom hos alle bedrifter</a></p><% } %>
       </div>
     </div>
 
@@ -39,6 +40,15 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
             <input class="input" type="search" id="filterText" placeholder="Søk etter rom eller sted" autocomplete="off" />
           </label>
+          <% if (orgFilters.length) { %>
+            <label class="filter-field">
+              <span class="sr-only">Bedrift</span>
+              <select class="input" id="filterOrg">
+                <option value="">Alle bedrifter</option>
+                <% orgFilters.forEach(function (o) { %><option value="<%= o.id %>"><%= o.name %></option><% }) %>
+              </select>
+            </label>
+          <% } %>
           <label class="filter-field">
             <span class="sr-only">Antall personer</span>
             <select class="input" id="filterCapacity">
@@ -78,12 +88,16 @@
         <% rooms.forEach(function (room, i) { const s = room.status; %>
           <a class="room-row" href="/rom/<%= room.id %>" style="--i: <%= i %>"
             data-room-id="<%= room.id %>"
-            data-search="<%= [room.name, room.location, room.description].filter(Boolean).join(' ').toLowerCase() %>"
+            data-org="<%= room.organization_id %>"
+            data-search="<%= [room.name, room.location, room.description, room.organization_name].filter(Boolean).join(' ').toLowerCase() %>"
             data-capacity="<%= room.capacity || '' %>"
             data-facilities="<%= room.facilities.join(',') %>">
             <div class="room-row-info">
               <div class="room-row-name"><%= room.name %></div>
               <div class="room-row-meta">
+                <% if (showOrg) { %>
+                  <span class="meta-item meta-org"><%- include('../partials/icon', { name: 'building', size: 14 }) %><%= room.organization_name %></span>
+                <% } %>
                 <% if (room.location) { %>
                   <span class="meta-item"><%- include('../partials/icon', { name: 'pin', size: 14 }) %><%= room.location %></span>
                 <% } %>

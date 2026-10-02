@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="nb">
 <head>
-  <%- include('../partials/head', { title: 'Be om admintilgang' }) %>
+  <%- include('../partials/head', { title: 'Be om tilgang' }) %>
   <script src="/vendor/altcha/nb.js" defer></script>
   <script src="/vendor/altcha/altcha.min.js" defer></script>
 </head>
@@ -10,14 +10,26 @@
   <main class="auth">
     <div class="auth-card auth-card-wide">
       <%- include('../partials/brand', { tag: 'Admin' }) %>
-      <h1 class="title">Be om admintilgang</h1>
-      <p class="lede">En administrator må godkjenne forespørselen før du kan logge inn. Du får svar på e-post.</p>
+      <h1 class="title">Be om tilgang</h1>
+      <p class="lede">Velg bedriften du skal administrere møterom for. Bedriftens administrator må godkjenne forespørselen før du kan logge inn, og du får svar på e-post.</p>
 
       <% if (error) { %>
         <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= error %></span></div>
       <% } %>
 
+      <% if (!organizations.length) { %>
+        <div class="alert alert-warning" role="status"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span>Det er ingen bedrifter å be om tilgang til ennå.</span></div>
+      <% } else { %>
       <form method="post" action="/admin/be-om-tilgang">
+        <div class="field">
+          <label for="organization">Bedrift</label>
+          <select class="input" id="organization" name="organization" required>
+            <option value="">Velg bedrift</option>
+            <% organizations.forEach(function (o) { %>
+              <option value="<%= o.id %>" <%= String(o.id) === String(values.organization) ? 'selected' : '' %>><%= o.name %></option>
+            <% }) %>
+          </select>
+        </div>
         <div class="field-row">
           <div class="field">
             <label for="name">Navn</label>
@@ -60,8 +72,9 @@
         <button type="submit" class="btn btn-primary btn-block">Send forespørsel</button>
         <p class="panel-note">Passordet lagres kryptert. Administratoren ser navn, e-post, brukernavn og begrunnelse, men aldri passordet.</p>
       </form>
+      <% } %>
 
-      <p class="auth-footer"><a href="/admin/login">Tilbake til innlogging</a></p>
+      <p class="auth-footer">Har du allerede en konto? <a href="/admin/login">Logg inn</a> og be om tilgang til flere bedrifter under «Min konto».</p>
     </div>
   </main>
 </body>

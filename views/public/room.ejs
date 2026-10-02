@@ -9,10 +9,11 @@
   <%- include('../partials/public-header') %>
 
   <main id="innhold" class="container">
-    <a class="back-link" href="/"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %>Alle rom</a>
+    <a class="back-link" href="/b/<%= room.organization_slug %>"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %>Alle rom hos <%= room.organization_name %></a>
 
     <div class="page-head">
       <div>
+        <p class="eyebrow"><%= room.organization_name %></p>
         <h1 class="title"><%= room.name %></h1>
         <div class="room-intro">
           <span class="status status-pill <%= status.free ? 'status-free' : 'status-busy' %>">

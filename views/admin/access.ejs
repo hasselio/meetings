@@ -9,8 +9,8 @@
   <main id="innhold" class="container">
     <div class="page-head">
       <div>
-        <h1 class="title">Tilgang</h1>
-        <p class="lede">Godkjenn eller avslå forespørsler om tilgang, velg rolle, og administrer kontoene til de som har tilgang.</p>
+        <h1 class="title">Tilgang til <%= org.name %></h1>
+        <p class="lede">Brukergruppen som forvalter møterommene til <%= org.name %>. Rollene gjelder bare her; andre bedrifter styrer sine egne brukere.</p>
         <ul class="role-legend">
           <% Object.values(roles).forEach(function (role) { %>
             <li><strong><%= role.label %>:</strong> <%= role.description %></li>
@@ -33,7 +33,7 @@
           <div class="empty-state">
             <span class="empty-icon"><%- include('../partials/icon', { name: 'check', size: 20 }) %></span>
             <h2>Ingen forespørsler venter</h2>
-            <p>Nye forespørsler fra <a href="/admin/be-om-tilgang" target="_blank" rel="noopener">«Be om tilgang»</a> dukker opp her.</p>
+            <p>Del lenken <a href="/admin/be-om-tilgang?bedrift=<%= org.slug %>" target="_blank" rel="noopener">/admin/be-om-tilgang?bedrift=<%= org.slug %></a> med de som skal søke, så er <%= org.name %> valgt på forhånd.</p>
           </div>
         </div>
       <% } else { %>
@@ -42,9 +42,9 @@
           <% requests.forEach(function (r) { %>
             <li class="request">
               <div class="request-main">
-                <div class="request-name"><%= r.name %></div>
+                <div class="request-name"><%= r.name %><% if (r.user_id) { %> <span class="tag tag-role">Har konto fra før</span><% } %></div>
                 <div class="request-meta">
-                  <a href="mailto:<%= r.email %>"><%= r.email %></a>
+                  <% if (r.email) { %><a href="mailto:<%= r.email %>"><%= r.email %></a><% } %>
                   <span>Brukernavn: <strong><%= r.username %></strong></span>
                   <span class="tabular"><%= new Date(r.created_at.replace(' ', 'T') + 'Z').toLocaleString('nb-NO', { timeZone: timezone, dateStyle: 'medium', timeStyle: 'short' }) %></span>
                 </div>
@@ -72,29 +72,101 @@
       <% } %>
     </section>
 
-    <section class="section" aria-labelledby="admins-title">
-      <h2 class="section-title" id="admins-title">Brukere med tilgang <span class="count"><%= admins.length %></span></h2>
-      <ul class="request-list">
-        <% admins.forEach(function (a) { const self = a.id === adminId; %>
-          <li class="request request-compact">
-            <div class="request-main">
-              <div class="request-name">
-                <%= a.name || a.username %><% if (self) { %> <span class="you">deg</span><% } %>
-                <span class="tag tag-role tag-role-<%= a.role %>"><%= roleLabel(a.role) %></span>
-                <% if (a.must_change_password) { %><span class="tag tag-warning">Må velge nytt passord</span><% } %>
+    <section class="section" aria-labelledby="members-title">
+      <h2 class="section-title" id="members-title">Brukere i <%= org.name %> <span class="count"><%= members.length %></span></h2>
+      <% if (!members.length) { %>
+        <p class="muted">Ingen brukere ennå. Opprett den første under.</p>
+      <% } else { %>
+        <ul class="request-list">
+          <% members.forEach(function (a) { const self = a.id === adminId; %>
+            <li class="request request-compact">
+              <div class="request-main">
+                <div class="request-name">
+                  <%= a.name || a.username %><% if (self) { %> <span class="you">deg</span><% } %>
+                  <span class="tag tag-role tag-role-<%= a.role %>"><%= roleLabel(a.role) %></span>
+                  <% if (a.is_platform_admin) { %><span class="tag tag-role">Plattformadministrator</span><% } %>
+                  <% if (a.must_change_password) { %><span class="tag tag-warning">Må velge nytt passord</span><% } %>
+                </div>
+                <div class="request-meta">
+                  <span>Brukernavn: <strong><%= a.username %></strong></span>
+                  <% if (a.email) { %><a href="mailto:<%= a.email %>"><%= a.email %></a><% } else { %><span class="muted">Ingen e-post</span><% } %>
+                  <% if (a.other_orgs) { %><span class="muted">Også med i <%= a.other_orgs %> annen bedrift<%= a.other_orgs > 1 ? 'er' : '' %></span><% } %>
+                </div>
               </div>
-              <div class="request-meta">
-                <span>Brukernavn: <strong><%= a.username %></strong></span>
-                <% if (a.email) { %><a href="mailto:<%= a.email %>"><%= a.email %></a><% } else { %><span class="muted">Ingen e-post</span><% } %>
-                <span class="tabular">Lagt til <%= new Date(a.created_at.replace(' ', 'T') + 'Z').toLocaleDateString('nb-NO', { timeZone: timezone, dateStyle: 'medium' }) %></span>
-              </div>
+              <a class="btn btn-secondary btn-sm" href="<%= self ? '/admin/konto' : '/admin/brukere/' + a.id %>">
+                <%- include('../partials/icon', { name: 'pencil', size: 14 }) %><%= self ? 'Min konto' : 'Administrer' %>
+              </a>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+
+    <section class="section" aria-labelledby="create-title">
+      <form class="form-card form-card-wide" method="post" action="/admin/brukere" id="opprett">
+        <h2 class="form-section-title" id="create-title">Opprett bruker</h2>
+        <p class="form-section-note form-section-note-flush">Brukeren får et midlertidig passord som vises én gang, og må velge sitt eget ved første innlogging.</p>
+        <% if (createError) { %>
+          <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= createError %></span></div>
+        <% } %>
+        <div class="field-row">
+          <div class="field">
+            <label for="newName">Navn</label>
+            <input class="input" type="text" id="newName" name="name" maxlength="80" value="<%= createValues.name || '' %>" />
+          </div>
+          <div class="field">
+            <label for="newEmail">E-post</label>
+            <input class="input" type="email" id="newEmail" name="email" maxlength="120" value="<%= createValues.email || '' %>" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="newUsername">Brukernavn</label>
+            <input class="input" type="text" id="newUsername" name="username" maxlength="40" pattern="[\w.@\-]{3,40}" value="<%= createValues.username || '' %>" required />
+          </div>
+          <div class="field">
+            <label for="newRole">Rolle</label>
+            <select class="input" id="newRole" name="role">
+              <% Object.entries(roles).forEach(function ([key, role]) { %>
+                <option value="<%= key %>" <%= (createValues.role || 'viewer') === key ? 'selected' : '' %>><%= role.label %></option>
+              <% }) %>
+            </select>
+          </div>
+        </div>
+        <% if (canEmail) { %>
+          <label class="check">
+            <input type="checkbox" name="sendEmail" value="1" />
+            <span>Send det midlertidige passordet på e-post</span>
+          </label>
+        <% } %>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary"><%- include('../partials/icon', { name: 'plus', size: 15 }) %>Opprett bruker</button>
+        </div>
+      </form>
+
+      <% if (me.is_platform_admin) { %>
+        <form class="form-card form-card-wide account-section" method="post" action="/admin/brukere/eksisterende">
+          <h2 class="form-section-title">Legg til eksisterende bruker <span class="tag tag-role">Plattform</span></h2>
+          <p class="form-section-note form-section-note-flush">For personer som allerede har konto i en annen bedrift, f.eks. konsulenter eller fellestjenester.</p>
+          <div class="field-row">
+            <div class="field">
+              <label for="existingUsername">Brukernavn</label>
+              <input class="input" type="text" id="existingUsername" name="username" maxlength="40" required />
             </div>
-            <a class="btn btn-secondary btn-sm" href="<%= self ? '/admin/konto' : '/admin/administratorer/' + a.id %>">
-              <%- include('../partials/icon', { name: 'pencil', size: 14 }) %><%= self ? 'Min konto' : 'Administrer' %>
-            </a>
-          </li>
-        <% }) %>
-      </ul>
+            <div class="field">
+              <label for="existingRole">Rolle</label>
+              <select class="input" id="existingRole" name="role">
+                <% Object.entries(roles).forEach(function ([key, role]) { %>
+                  <option value="<%= key %>" <%= key === 'viewer' ? 'selected' : '' %>><%= role.label %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-secondary">Legg til</button>
+          </div>
+        </form>
+      <% } %>
     </section>
 
     <% if (decisions.length) { %>

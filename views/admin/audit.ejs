@@ -7,18 +7,18 @@
   <%- include('../partials/admin-header') %>
 
   <main id="innhold" class="container">
-    <%- include('../partials/audit-tabs', { current: 'log' }) %>
+    <% if (platform) { %><%- include('../partials/platform-tabs', { current: 'log' }) %><% } else { %><%- include('../partials/audit-tabs', { current: 'log' }) %><% } %>
     <div class="page-head">
       <div>
-        <h1 class="title">Revisjonslogg</h1>
-        <p class="lede">Hvem gjorde hva, og når. Oppføringer eldre enn <%= retentionMonths %> måneder slettes automatisk.</p>
+        <h1 class="title"><%= platform ? 'Revisjonslogg for hele plattformen' : 'Revisjonslogg for ' + org.name %></h1>
+        <p class="lede"><%= platform ? 'Alle bedrifter, pluss innlogginger og endringer i bedrifter og plattformadministratorer.' : 'Hvem gjorde hva i ' + org.name + ', og når.' %> Oppføringer eldre enn <%= retentionMonths %> måneder slettes automatisk.</p>
       </div>
     </div>
 
     <nav class="segmented audit-filter" aria-label="Filtrer logg">
-      <a href="/admin/logg" <%- !category ? 'aria-current="true"' : '' %>>Alt</a>
+      <a href="<%= basePath %>" <%- !category ? 'aria-current="true"' : '' %>>Alt</a>
       <% Object.entries(categories).forEach(function ([key, label]) { %>
-        <a href="/admin/logg?kategori=<%= key %>" <%- category === key ? 'aria-current="true"' : '' %>><%= label %></a>
+        <a href="<%= basePath %>?kategori=<%= key %>" <%- category === key ? 'aria-current="true"' : '' %>><%= label %></a>
       <% }) %>
     </nav>
 
@@ -39,11 +39,11 @@
           <li class="audit-entry <%= warn ? 'audit-entry-warn' : '' %>">
             <time class="audit-when" datetime="<%= e.at %>"><%= new Date(e.at).toLocaleString('nb-NO', { timeZone: timezone, dateStyle: 'short', timeStyle: 'short' }) %></time>
             <span class="audit-summary"><%= e.summary %></span>
-            <span class="audit-meta"><%= who %> · <%= e.action %><% if (e.ip) { %> · <%= e.ip %><% } %></span>
+            <span class="audit-meta"><% if (platform) { %><%= e.organization_name || 'Plattform' %> · <% } %><%= who %> · <%= e.action %><% if (e.ip) { %> · <%= e.ip %><% } %></span>
           </li>
         <% }) %>
       </ul>
-      <% const qs = (p) => '/admin/logg?' + (category ? 'kategori=' + category + '&' : '') + 'side=' + p; %>
+      <% const qs = (p) => basePath + '?' + (category ? 'kategori=' + category + '&' : '') + 'side=' + p; %>
       <div class="pager">
         <span class="tabular"><%= total %> hendelser · side <%= page %> av <%= pages %></span>
         <span class="request-actions">

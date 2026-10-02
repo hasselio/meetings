@@ -7,37 +7,56 @@
   <%- include('../partials/admin-header') %>
 
   <main id="innhold" class="container">
-    <a class="back-link" href="/admin/tilgang"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %>Tilgang</a>
+    <a class="back-link" href="/admin/tilgang"><%- include('../partials/icon', { name: 'arrow-left', size: 16 }) %>Tilgang til <%= org.name %></a>
 
     <div class="page-head">
       <div>
         <h1 class="title"><%= target.name || target.username %></h1>
-        <p class="lede"><%= roleLabel(target.role) %> siden <%= new Date(target.created_at.replace(' ', 'T') + 'Z').toLocaleDateString('nb-NO', { dateStyle: 'long' }) %>.
+        <p class="lede"><%= roleLabel(target.role) %> i <%= org.name %>.
           <% if (target.must_change_password) { %>Må velge nytt passord ved neste innlogging.<% } %></p>
       </div>
     </div>
 
-    <form class="form-card form-card-wide" method="post" action="/admin/administratorer/<%= target.id %>">
-      <h2 class="form-section-title">Kontoopplysninger</h2>
+    <% if (flash) { %>
+      <div class="alert <%= flash.type === 'error' ? 'alert-error' : 'alert-success' %> form-card-wide" role="status">
+        <%- include('../partials/icon', { name: flash.type === 'error' ? 'alert' : 'check', size: 16 }) %><span><%= flash.text %></span>
+      </div>
+    <% } %>
+
+    <form class="form-card form-card-wide" method="post" action="/admin/brukere/<%= target.id %>">
       <% if (error) { %>
         <div class="alert alert-error" role="alert"><%- include('../partials/icon', { name: 'alert', size: 16 }) %><span><%= error %></span></div>
       <% } %>
-      <div class="field-row">
-        <div class="field">
-          <label for="name">Navn</label>
-          <input class="input" type="text" id="name" name="name" maxlength="80" value="<%= values.name || '' %>" />
+
+      <h2 class="form-section-title">Kontoopplysninger</h2>
+      <% if (editable) { %>
+        <div class="field-row">
+          <div class="field">
+            <label for="name">Navn</label>
+            <input class="input" type="text" id="name" name="name" maxlength="80" value="<%= values.name || '' %>" />
+          </div>
+          <div class="field">
+            <label for="email">E-post</label>
+            <input class="input" type="email" id="email" name="email" maxlength="120" value="<%= values.email || '' %>" />
+          </div>
         </div>
         <div class="field">
-          <label for="email">E-post</label>
-          <input class="input" type="email" id="email" name="email" maxlength="120" value="<%= values.email || '' %>" />
+          <label for="username">Brukernavn <span class="label-hint">(brukes for å logge inn)</span></label>
+          <input class="input" type="text" id="username" name="username" maxlength="40" pattern="[\w.@\-]{3,40}" value="<%= values.username %>" required />
         </div>
-      </div>
-      <div class="field">
-        <label for="username">Brukernavn <span class="label-hint">(brukes for å logge inn)</span></label>
-        <input class="input" type="text" id="username" name="username" maxlength="40" pattern="[\w.@\-]{3,40}" value="<%= values.username %>" required />
-      </div>
+      <% } else { %>
+        <dl class="details details-inline">
+          <div><dt>Brukernavn</dt><dd><%= target.username %></dd></div>
+          <div><dt>E-post</dt><dd><%= target.email || 'Ingen' %></dd></div>
+        </dl>
+        <p class="form-section-note form-section-note-flush">
+          <%= target.is_platform_admin ? 'Dette er en plattformadministrator.' : 'Kontoen brukes også i ' + otherOrgs.map(function (o) { return o.name; }).join(', ') + '.' %>
+          Kontoopplysninger og passord kan derfor bare endres av personen selv eller en plattformadministrator, så ingen bedrift kan låse brukeren ute fra en annen.
+        </p>
+      <% } %>
+
       <fieldset class="field fieldset role-choice">
-        <legend>Rolle</legend>
+        <legend>Rolle i <%= org.name %></legend>
         <% Object.entries(roles).forEach(function ([key, role]) { %>
           <label class="check">
             <input type="radio" name="role" value="<%= key %>" <%= (values.role || target.role) === key ? 'checked' : '' %> />
@@ -51,41 +70,47 @@
       </div>
     </form>
 
-    <section class="form-card form-card-wide account-section" aria-labelledby="reset-title">
-      <h2 class="form-section-title" id="reset-title">Tilbakestill passord</h2>
-      <p class="form-section-note form-section-note-flush">
-        Lager et midlertidig passord som vises for deg én gang. <%= target.name || target.username %> blir logget ut overalt, og må velge nytt passord ved neste innlogging.
-      </p>
-      <form method="post" action="/admin/administratorer/<%= target.id %>/tilbakestill">
-        <% if (target.email && canEmail) { %>
-          <label class="check">
-            <input type="checkbox" name="sendEmail" value="1" />
-            <span>Send det midlertidige passordet til <strong><%= target.email %></strong></span>
-          </label>
-        <% } else if (!target.email) { %>
-          <p class="form-section-note form-section-note-flush">Kontoen har ingen e-post, så du må gi passordet videre selv.</p>
-        <% } else { %>
-          <p class="form-section-note form-section-note-flush">E-post er ikke satt opp på serveren, så du må gi passordet videre selv.</p>
-        <% } %>
-        <div class="form-actions">
-          <button type="submit" class="btn btn-secondary" data-confirm data-confirm-label="Bekreft tilbakestilling">Tilbakestill passord</button>
-        </div>
-      </form>
-    </section>
+    <% if (editable) { %>
+      <section class="form-card form-card-wide account-section" aria-labelledby="reset-title">
+        <h2 class="form-section-title" id="reset-title">Tilbakestill passord</h2>
+        <p class="form-section-note form-section-note-flush">
+          Lager et midlertidig passord som vises for deg én gang. <%= target.name || target.username %> blir logget ut overalt, og må velge nytt passord ved neste innlogging.
+        </p>
+        <form method="post" action="/admin/brukere/<%= target.id %>/tilbakestill">
+          <% if (target.email && canEmail) { %>
+            <label class="check">
+              <input type="checkbox" name="sendEmail" value="1" />
+              <span>Send det midlertidige passordet til <strong><%= target.email %></strong></span>
+            </label>
+          <% } else if (!target.email) { %>
+            <p class="form-section-note form-section-note-flush">Kontoen har ingen e-post, så du må gi passordet videre selv.</p>
+          <% } else { %>
+            <p class="form-section-note form-section-note-flush">E-post er ikke satt opp på serveren, så du må gi passordet videre selv.</p>
+          <% } %>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-secondary" data-confirm data-confirm-label="Bekreft tilbakestilling">Tilbakestill passord</button>
+          </div>
+        </form>
+      </section>
+    <% } %>
 
     <section class="form-card form-card-wide account-section" aria-labelledby="remove-title">
-      <h2 class="form-section-title" id="remove-title">Fjern tilgang</h2>
-      <% if (adminCount > 1 && !(target.role === 'admin' && adminRoleCount <= 1)) { %>
-        <p class="form-section-note form-section-note-flush">Kontoen slettes, og <%= target.name || target.username %> logges ut med en gang. Rom og bookinger påvirkes ikke.</p>
-        <form method="post" action="/admin/administratorer/<%= target.id %>/fjern">
+      <h2 class="form-section-title" id="remove-title">Fjern fra <%= org.name %></h2>
+      <% if (target.role === 'admin' && adminCount <= 1) { %>
+        <p class="form-section-note form-section-note-flush">Dette er den eneste administratoren i <%= org.name %>. Gi en annen rollen administrator først.</p>
+      <% } else { %>
+        <p class="form-section-note form-section-note-flush">
+          <%= target.name || target.username %> mister tilgangen til <%= org.name %> med en gang.
+          <%= otherOrgs.length || target.is_platform_admin ? 'Kontoen beholdes, siden den brukes andre steder.' : 'Kontoen slettes, siden den ikke brukes i noen annen bedrift.' %>
+          Rom og bookinger påvirkes ikke.
+        </p>
+        <form method="post" action="/admin/brukere/<%= target.id %>/fjern">
           <div class="form-actions">
             <button type="submit" class="btn btn-danger" data-confirm data-confirm-label="Bekreft fjerning">
               <%- include('../partials/icon', { name: 'trash', size: 15 }) %>Fjern tilgang
             </button>
           </div>
         </form>
-      <% } else { %>
-        <p class="form-section-note form-section-note-flush">Dette er den eneste med rollen administrator, så tilgangen kan ikke fjernes.</p>
       <% } %>
     </section>
   </main>

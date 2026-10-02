@@ -1,7 +1,8 @@
 // Felles oppsett for testene. Må lastes før appen, siden konfigurasjonen leses ved oppstart.
 process.env.NODE_ENV = 'test';
 process.env.SESSION_SECRET = 'test-secret-som-er-lang-nok-1234';
-process.env.DB_PATH = ':memory:';
+// Migreringstesten peker på en egen fil; ellers en tom database i minnet.
+process.env.DB_PATH = process.env.TEST_DB_PATH || ':memory:';
 process.env.TIMEZONE = 'Europe/Oslo';
 process.env.BASE_URL = 'http://localhost:3000';
 if (process.env.SMTP_HOST === undefined) process.env.SMTP_HOST = '';
@@ -14,9 +15,27 @@ const models = require('../src/models');
 
 const PASSWORD = 'test-passord-123';
 
-function createAdmin(username, role = 'admin', extra = {}) {
-  const user = models.AdminUsers.create({ username, passwordHash: bcrypt.hashSync(PASSWORD, 4), ...extra });
-  if (role !== 'admin') db.prepare('UPDATE admin_users SET role = ? WHERE id = ?').run(role, user.id);
+let defaultOrg = null;
+
+// Bedriften testene bruker når ingen annen er oppgitt.
+function testOrg() {
+  if (!defaultOrg) defaultOrg = models.Organizations.create({ name: 'Testbedrift', slug: 'testbedrift' });
+  return defaultOrg;
+}
+
+function createOrg(name, slug = require('../src/slug').slugify(name)) {
+  return models.Organizations.create({ name, slug });
+}
+
+// Bruker med rolle i en bedrift (standard: testbedriften). platform: true gir plattformadministrator.
+function createAdmin(username, role = 'admin', { org = testOrg(), platform = false, ...extra } = {}) {
+  const user = models.AdminUsers.create({
+    username,
+    passwordHash: bcrypt.hashSync(PASSWORD, 4),
+    isPlatformAdmin: platform,
+    ...extra,
+  });
+  if (org) models.Memberships.add(user.id, org.id, role);
   return models.AdminUsers.findById(user.id);
 }
 
@@ -28,7 +47,13 @@ async function login(username, password = PASSWORD) {
 }
 
 function createRoom(extra = {}) {
-  return models.Rooms.create({ name: 'Testrom', color: '#3f5bd9', facilities: [], ...extra });
+  return models.Rooms.create({
+    name: 'Testrom',
+    color: '#3f5bd9',
+    facilities: [],
+    organization_id: testOrg().id,
+    ...extra,
+  });
 }
 
 // Tidspunkt i Oslo-tid som ISO-streng, f.eks. at('2030-03-04', '10:00').
@@ -39,4 +64,4 @@ function at(date, time) {
   return zonedTimeToUtc(y, m, d, h, mi, 'Europe/Oslo').toISOString();
 }
 
-module.exports = { app, db, models, request, createAdmin, login, createRoom, at, PASSWORD };
+module.exports = { app, db, models, request, createAdmin, createOrg, testOrg, login, createRoom, at, PASSWORD };

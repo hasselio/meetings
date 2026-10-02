@@ -36,7 +36,11 @@ async function send(message) {
 // `rooms` er enten ett rom eller en funksjon (roomId) => rom, for serier der forekomster er flyttet.
 
 const roomLookup = (rooms) => (typeof rooms === 'function' ? rooms : () => rooms);
-const locationOf = (room) => (room.location ? `${room.name}, ${room.location}` : room.name);
+// «Fjorden, 2. etasje (Acme AS)»: bedriften står med, så den som booket ser hvem rommet tilhører.
+function locationOf(room) {
+  const place = room.location ? `${room.name}, ${room.location}` : room.name;
+  return room.organization_name ? `${place} (${room.organization_name})` : place;
+}
 const seriesUid = (seriesId) => `serie-${seriesId}@moterom`;
 const seriesSequence = (bookings) => bookings.reduce((sum, b) => sum + (b.ics_sequence || 0), 0);
 
@@ -215,23 +219,36 @@ function sendReminder(booking, room) {
 const sendText = (to, subject, text) => send({ to, subject, text });
 const adminUrl = (path) => `${config.baseUrl}/admin${path}`;
 
-function notifyNewAccessRequest(request) {
+// Søknaden går til bedriftens administratorer (eller ADMIN_NOTIFY_EMAIL hvis bedriften ikke har noen med e-post).
+function notifyNewAccessRequest(request, org, recipients = []) {
+  const to = recipients.length ? recipients.join(', ') : config.adminNotifyEmail;
   return sendText(
-    config.adminNotifyEmail,
-    `Ny forespørsel om tilgang: ${request.name}`,
-    `${request.name} (${request.email}) ber om tilgang med brukernavnet «${request.username}».\n\n` +
+    to,
+    `Ny forespørsel om tilgang til ${org.name}: ${request.name}`,
+    `${request.name} (${request.email}) ber om tilgang til ${org.name} med brukernavnet «${request.username}».\n\n` +
       (request.reason ? `Begrunnelse:\n${request.reason}\n\n` : '') +
-      `Godkjenn eller avslå her: ${adminUrl('/tilgang')}\n`
+      `Godkjenn eller avslå her (velg ${org.name} i admin): ${adminUrl('/tilgang')}\n`
   );
 }
 
-function notifyAccessDecision(request, approved) {
+function notifyAccessDecision(request, approved, org) {
   return sendText(
     request.email,
-    approved ? 'Du har fått tilgang' : 'Forespørselen om tilgang ble avslått',
+    approved ? `Du har fått tilgang til ${org.name}` : `Forespørselen om tilgang til ${org.name} ble avslått`,
     approved
-      ? `Hei ${request.name},\n\nForespørselen din er godkjent. Logg inn med brukernavnet «${request.username}» og passordet du valgte:\n${adminUrl('/login')}\n`
-      : `Hei ${request.name},\n\nForespørselen din om tilgang ble avslått. Ta kontakt med en administrator hvis du mener dette er feil.\n`
+      ? `Hei ${request.name},\n\nForespørselen din om tilgang til ${org.name} er godkjent. Logg inn med brukernavnet «${request.username}»:\n${adminUrl('/login')}\n`
+      : `Hei ${request.name},\n\nForespørselen din om tilgang til ${org.name} ble avslått. Ta kontakt med bedriftens administrator hvis du mener dette er feil.\n`
+  );
+}
+
+function notifyAccountCreated(user, temporaryPassword, org) {
+  return sendText(
+    user.email,
+    `Du har fått tilgang til møterommene til ${org.name}`,
+    `Hei ${user.name || user.username},\n\n` +
+      `Det er opprettet en konto til deg for å administrere møterommene til ${org.name}. Logg inn med brukernavnet «${user.username}» og dette midlertidige passordet:\n\n` +
+      `${temporaryPassword}\n\n` +
+      `Du blir bedt om å velge et eget passord første gang du logger inn:\n${adminUrl('/login')}\n`
   );
 }
 
@@ -258,4 +275,5 @@ module.exports = {
   notifyNewAccessRequest,
   notifyAccessDecision,
   notifyPasswordReset,
+  notifyAccountCreated,
 };

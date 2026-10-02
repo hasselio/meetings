@@ -1,13 +1,36 @@
 # Møteromsbooking
 
-Møteromsbooking for hosting på f.eks. en Raspberry Pi. Eksterne og interne ser ledig/opptatt og booker selv; de som forvalter rommene, har et eget admingrensesnitt.
+Møteromsbooking for hosting på f.eks. en Raspberry Pi. Eksterne og interne ser ledig/opptatt og booker selv; de som forvalter rommene, har et eget admingrensesnitt. Flere bedrifter kan dele løsningen: hver bedrift har sine egne rom og sin egen brukergruppe, og kan ikke se eller endre andres.
 
 Bygget med Node.js, Express og SQLite (better-sqlite3). Det trengs ingen ekstern database eller byggesteg, og alt (fonter, kalender, robot-sjekk) er selv-hostet.
 
 ## Funksjoner
 
+### Bedrifter og hierarki
+
+```
+Plattform            Plattformadministratorer: oppretter og deaktiverer bedrifter, utnevner deres
+   │                 første administrator, kan gå inn i alle bedrifter, ser samlet revisjonslogg.
+   ├── Acme AS       Egen brukergruppe (Administrator / Romansvarlig / Lesetilgang), egne rom,
+   │                 bookinger, sperringer, rapporter og logg.
+   └── Beta AS       Ser og endrer bare sitt eget.
+```
+
+- **Hver bedrift eier sine rom.** Alle oppslag i admin går gjennom den aktive bedriften. Forsøk på å nå et rom, en booking, en sperring, en bruker eller en søknad i en annen bedrift gir «finnes ikke» (404), så man kan ikke engang se at det finnes. Et møte kan bare flyttes til et rom i samme bedrift.
+- **Én bruker kan være med i flere bedrifter**, med egen rolle i hver, og bytter bedrift i linjen under toppmenyen.
+- **Kontoopplysninger og passord** gjelder på tvers av bedrifter. En bedriftsadministrator kan derfor bare endre dem, eller tilbakestille passord, for kontoer som utelukkende tilhører egen bedrift. Ellers kunne én bedrift låse ute en bruker i en annen. Rollen i egen bedrift kan alltid endres.
+- **Ingen bedrift kan stå uten administrator**, og det må alltid finnes minst én plattformadministrator.
+- **Deaktiverte bedrifter** forsvinner fra den offentlige siden, rommene kan ikke bookes, og brukerne logges ut. Ingenting slettes. Bare bedrifter uten rom kan slettes helt.
+- **Nye brukere:**
+  - De kan be om tilgang på `/admin/be-om-tilgang` og velge bedrift; lenken `/admin/be-om-tilgang?bedrift=acme-as` velger bedriften på forhånd. Søknaden går til bedriftens administratorer.
+  - Bedriftens administrator kan også opprette brukere direkte, med midlertidig passord.
+  - Innloggede brukere kan be om tilgang til flere bedrifter under «Min konto».
+  - Plattformadministratorer kan legge en eksisterende bruker til i en bedrift.
+- **Revisjonsloggen** føres per bedrift. Innlogginger og endringer i bedrifter og plattformadministratorer føres på plattformnivå.
+
 ### For de som booker (`/`)
 
+- **Felles forside** med rom fra alle aktive bedrifter og filter per bedrift, og en **egen side per bedrift** (`/b/acme-as`) som bare viser deres rom. Romsiden og e-postene viser hvilken bedrift rommet tilhører.
 - **Finn rom:** søk på navn og sted, filtrer på antall personer og fasiliteter, og se hvilke rom som er ledige i et bestemt tidsrom. Romsiden fylles ut med tiden man søkte på.
 - **Kalender per rom** med bare ledig/opptatt, og rommets regler (åpningstid, dager, maks varighet osv.).
 - **Booking** av enkeltmøter eller **gjentakende møter** (hver ukedag, hver uke eller annenhver uke, maks 26 møter). Opptatte datoer kan hoppes over.
@@ -32,15 +55,15 @@ Bygget med Node.js, Express og SQLite (better-sqlite3). Det trengs ingen ekstern
   - **Regler per rom:** dager, åpningstid, maks varighet, hvor langt frem man kan booke og pause mellom møter. Administratorer kan booke utenfor reglene, men aldri oppå andre bookinger eller sperringer.
   - **Sperrede perioder** for ett rom eller alle, f.eks. ved oppussing, med valg om å avlyse bookinger i perioden og varsle de som har booket.
 - **Rapporter:** utnyttelsesgrad per rom (bookede timer delt på åpne timer minus sperringer), antall bookinger, avlysninger og fordeling per ukedag. Utnyttelse og bookinger kan eksporteres som CSV for Excel.
-- **Tilgang og roller:**
+- **Tilgang og roller** (gjelder innenfor én bedrift):
 
   | Rolle | Kan |
   | --- | --- |
-  | Administrator | Alt, inkludert tilgangsstyring, kontoer, revisjonslogg og sletting av personopplysninger |
+  | Administrator | Alt i bedriften, inkludert brukere, revisjonslogg og sletting av personopplysninger |
   | Romansvarlig | Bookinger, rom, regler, sperringer, rapporter og CSV-eksport |
   | Lesetilgang | Se bookinger, rom og rapporter, uten å endre noe |
 
-  Nye brukere ber om tilgang på `/admin/be-om-tilgang`, og rollen velges når forespørselen godkjennes. Kontoer kan få endret opplysninger og rolle, få tilbakestilt passord (må velge nytt ved neste innlogging) eller fjernes.
+  Rollen velges når en søknad godkjennes eller en bruker opprettes. Brukere kan få endret rolle, få tilbakestilt passord (må velge nytt ved neste innlogging) eller fjernes fra bedriften. Kontoen slettes når den ikke lenger er med i noen bedrift.
 - **Revisjonslogg:** hvem som gjorde hva og når: bookinger, rom, sperringer, tilganger, innlogginger og eksport. Loggen kan filtreres.
 - **Innsyn og sletting:** finn alle bookinger for en e-postadresse og slett personopplysningene (kommende møter avlyses først).
 - **Se som besøkende:** viser den offentlige siden i en modal, akkurat slik besøkende ser den.
@@ -65,17 +88,23 @@ Bygget med Node.js, Express og SQLite (better-sqlite3). Det trengs ingen ekstern
    - `RETENTION_MONTHS` (standard 6), `AUDIT_RETENTION_MONTHS` (standard 12), `PRIVACY_CONTACT`: oppbevaringstid og kontaktadresse i personvernerklæringen.
 
 4. Start tjenesten med `npm start`. Den lytter på `127.0.0.1` og porten i `.env`, og er ment å stå bak en reverse proxy med HTTPS. Robot-sjekken krever HTTPS (eller `localhost`).
-5. Opprett den første administratoren på serveren:
+5. Opprett den første plattformadministratoren på serveren:
 
    ```bash
    npm run create-admin
    ```
 
-   Samme kommando setter nytt passord hvis brukernavnet finnes fra før.
+   Samme kommando setter nytt passord hvis brukernavnet finnes fra før, og kan gjøre en eksisterende konto til plattformadministrator. Logg deretter inn, gå til «Plattform» og opprett bedriftene med deres første administrator.
 
 ## Oppdatere en eksisterende installasjon
 
-Databasen oppgraderes automatisk ved oppstart: nye tabeller og kolonner legges til, og eksisterende administratorer får rollen Administrator. Ta likevel backup først:
+Databasen oppgraderes automatisk ved oppstart. Ved overgangen til flere bedrifter skjer følgende:
+
+- Alle rom, bookinger og brukere flyttes inn i en første bedrift. Den heter `FIRST_ORG_NAME`, standard «Min bedrift», og kan få nytt navn under «Plattform».
+- Dagens administratorer blir plattformadministratorer og administratorer i bedriften.
+- Romansvarlige og brukere med lesetilgang beholder rollen sin.
+
+Ta likevel backup først:
 
 ```bash
 cd /srv/www/meetings/repo                  # eller der prosjektet ligger
@@ -158,6 +187,8 @@ GitHub Actions kjører testene på Node 20 og 22 ved hver push og pull request (
 - `src/services/bookings.js`: all bookinglogikk (regler, sperringer, overlapp, opprettelse, bekreftelse, endring, avlysning), felles for det offentlige skjemaet, lenken i e-posten og admin. Sjekk og lagring skjer i samme databasetransaksjon, så to som booker samtidig ikke kan få samme tid.
 - `src/ics.js`: egen iCalendar-generator med VTIMEZONE, gjentakelse (RRULE/EXDATE/RECURRENCE-ID), riktig escaping og linjebretting.
 - `src/recurrence.js`: forekomster for serier, regnet i lokal tid, så klokkeslettet holder seg over sommertid/vintertid.
+- `src/routes/admin/`: adminrutene, delt opp i bookinger, rom, tilgang, konto, logg/rapporter og plattform. Alt unntatt konto og plattform krever en aktiv bedrift (`req.org`), og bruker oppslag som `Rooms.getInOrg` og `Bookings.getInOrg`.
+- `src/middleware/auth.js`: innlogging, aktiv bedrift og rollen i den (`req.admin.role`).
 - `src/roles.js` og `src/audit.js`: roller/tillatelser og revisjonslogg.
 - `src/jobs.js` og `src/services/maintenance.js`: jevnlige jobber.
 - Grensene for antall forsøk ligger i minnet og nullstilles ved omstart. Innlogginger lagres i databasen.

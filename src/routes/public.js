@@ -1,5 +1,5 @@
 const express = require('express');
-const { Rooms, Bookings, RoomBlocks } = require('../models');
+const { Rooms, Bookings, RoomBlocks, Organizations } = require('../models');
 const { currentAdmin } = require('../middleware/auth');
 const { createLimiter } = require('../middleware/rate-limit');
 const { bookingChallengeHandler, verifyBookingCaptcha } = require('../captcha');
@@ -26,25 +26,41 @@ router.use((req, res, next) => {
   next();
 });
 
-router.get('/', (req, res) => {
+// Forsiden viser rom fra alle aktive bedrifter; /b/:slug viser bare én bedrifts rom.
+function renderHome(res, org = null) {
   const now = new Date();
-  const rooms = Rooms.all().map((r) => ({
+  const rooms = Rooms.publicAll(org ? org.id : null).map((r) => ({
     ...r,
     status: roomStatus(r.id, now),
     facilityList: Facilities.describe(r.facilities),
   }));
   const usedFacilities = new Set(rooms.flatMap((r) => r.facilities));
+  // Bedriftsfilteret vises bare på fellessiden, og bare når flere bedrifter har rom.
+  const orgFilters = org
+    ? []
+    : [...new Map(rooms.map((r) => [r.organization_id, { id: r.organization_id, name: r.organization_name, slug: r.organization_slug }])).values()];
   res.render('public/home', {
     rooms,
+    org,
+    orgFilters: orgFilters.length > 1 ? orgFilters : [],
+    showOrg: !org && orgFilters.length > 1,
     facilityFilters: Facilities.FACILITIES.filter((f) => usedFacilities.has(f.key)),
     freeCount: rooms.filter((r) => r.status.free).length,
     today: formatToday(now),
     hours: timelineHours(),
   });
+}
+
+router.get('/', (req, res) => renderHome(res));
+
+router.get('/b/:slug', (req, res) => {
+  const org = Organizations.bySlug(req.params.slug);
+  if (!org || !org.active) return res.status(404).render('public/not-found');
+  renderHome(res, org);
 });
 
 router.get('/rom/:id', (req, res) => {
-  const room = Rooms.get(req.params.id);
+  const room = Rooms.publicGet(req.params.id);
   if (!room) return res.status(404).render('public/not-found');
   res.render('public/room', {
     room,
@@ -80,7 +96,7 @@ router.get('/api/availability', (req, res) => {
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start || end - start > 24 * 3600 * 1000) {
     return res.status(400).json({ error: 'Velg et gyldig tidsrom.' });
   }
-  const rooms = Rooms.all().map((room) => {
+  const rooms = Rooms.publicAll().map((room) => {
     const problem = BookingService.slotProblem(room, start, end);
     return { id: room.id, free: !problem, reason: problem ? problem.error : null };
   });
@@ -92,7 +108,7 @@ const FEED_PAST_DAYS = 30;
 const FEED_FUTURE_DAYS = 180;
 
 router.get('/rom/:id/kalender.ics', (req, res) => {
-  const room = Rooms.get(req.params.id);
+  const room = Rooms.publicGet(req.params.id);
   if (!room) return res.status(404).type('text/plain').send('Rommet finnes ikke.');
   const now = Date.now();
   const from = new Date(now - FEED_PAST_DAYS * 24 * 3600 * 1000).toISOString();
@@ -113,12 +129,12 @@ router.get('/rom/:id/kalender.ics', (req, res) => {
   const events = busy.concat(blocked).map((e) => ({ ...e, location: room.location ? `${room.name}, ${room.location}` : room.name }));
   res.set('Cache-Control', 'public, max-age=300');
   res.type('text/calendar; charset=utf-8');
-  res.send(buildCalendar({ events, name: `${room.name} (${config.appName})` }));
+  res.send(buildCalendar({ events, name: `${room.name} (${room.organization_name})` }));
 });
 
 // Offentlig API: kun ledig/opptatt, ingen detaljer om hvem som har booket
 router.get('/api/rooms/:id/events', (req, res) => {
-  const room = Rooms.get(req.params.id);
+  const room = Rooms.publicGet(req.params.id);
   if (!room) return res.status(404).json({ error: 'Rom ikke funnet' });
 
   const range = parseRange(req.query);
@@ -142,7 +158,8 @@ router.get('/api/rooms/:id/events', (req, res) => {
 });
 
 router.post('/api/rooms/:id/bookings', verifyBookingCaptcha, async (req, res) => {
-  const room = Rooms.get(req.params.id);
+  // Rom i deaktiverte bedrifter kan ikke bookes.
+  const room = Rooms.publicGet(req.params.id);
   if (!room) return res.status(404).json({ error: 'Rom ikke funnet' });
 
   // Skjult felt som bare roboter fyller ut. Svaret ser vellykket ut, men ingenting lagres.

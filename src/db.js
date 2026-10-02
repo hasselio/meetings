@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
+const { slugify } = require('./slug');
 
 // DB_PATH lar testene bruke en egen database (f.eks. ':memory:').
 const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'mettings.db');
@@ -94,6 +95,26 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_room_blocks ON room_blocks(room_id, start_time, end_time);
+
+  -- Bedrifter. Hver bedrift eier sine rom, og har sin egen brukergruppe.
+  CREATE TABLE IF NOT EXISTS organizations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Hvilke bedrifter en bruker tilhører, og rollen i hver av dem.
+  CREATE TABLE IF NOT EXISTS memberships (
+    user_id INTEGER NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (user_id, organization_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_memberships_org ON memberships(organization_id);
 `);
 
 // Eldre databaser får nye kolonner lagt til ved oppstart.
@@ -115,16 +136,28 @@ addMissingColumns('rooms', {
   buffer_minutes: 'INTEGER NOT NULL DEFAULT 0',
 });
 
+addMissingColumns('rooms', { organization_id: 'INTEGER REFERENCES organizations(id)' });
+
 addMissingColumns('admin_users', {
   name: 'TEXT',
   email: 'TEXT',
   must_change_password: 'INTEGER NOT NULL DEFAULT 0',
   // Økes ved passordbytte og tilbakestilling, slik at alle eksisterende økter for kontoen blir ugyldige.
   session_version: 'INTEGER NOT NULL DEFAULT 0',
+  // Brukes ikke lenger: rollen ligger nå per bedrift i memberships. Beholdes for migreringen.
   role: `TEXT NOT NULL DEFAULT 'admin'`,
+  // Plattformadministratorer styrer bedrifter og har tilgang til alt.
+  is_platform_admin: 'INTEGER NOT NULL DEFAULT 0',
 });
 
-addMissingColumns('admin_requests', { role: `TEXT NOT NULL DEFAULT 'viewer'` });
+addMissingColumns('admin_requests', {
+  role: `TEXT NOT NULL DEFAULT 'viewer'`,
+  organization_id: 'INTEGER REFERENCES organizations(id) ON DELETE CASCADE',
+  // Satt når en innlogget bruker ber om tilgang til en bedrift til.
+  user_id: 'INTEGER REFERENCES admin_users(id) ON DELETE CASCADE',
+});
+
+addMissingColumns('audit_log', { organization_id: 'INTEGER' });
 
 addMissingColumns('bookings', {
   // Hash av lenken i e-posten; selve lenken lagres aldri.
@@ -144,6 +177,32 @@ addMissingColumns('bookings', {
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_bookings_token ON bookings(manage_token_hash);
   CREATE INDEX IF NOT EXISTS idx_bookings_series ON bookings(series_id);
+  CREATE INDEX IF NOT EXISTS idx_rooms_org ON rooms(organization_id);
+  CREATE INDEX IF NOT EXISTS idx_audit_org ON audit_log(organization_id, id);
+  CREATE INDEX IF NOT EXISTS idx_requests_org ON admin_requests(organization_id, status);
 `);
+
+// Versjon 1: flere bedrifter. Finnes det data fra før, flyttes alt inn i en første bedrift,
+// og dagens administratorer blir plattformadministratorer (og administratorer i bedriften).
+if (db.pragma('user_version', { simple: true }) < 1) {
+  db.transaction(() => {
+    const hasData =
+      db.prepare('SELECT COUNT(*) AS n FROM rooms').get().n + db.prepare('SELECT COUNT(*) AS n FROM admin_users').get().n > 0;
+    if (hasData) {
+      const name = process.env.FIRST_ORG_NAME || 'Min bedrift';
+      const slug = slugify(name);
+      const orgId = db.prepare('INSERT INTO organizations (name, slug) VALUES (?, ?)').run(name, slug).lastInsertRowid;
+      db.prepare('UPDATE rooms SET organization_id = ? WHERE organization_id IS NULL').run(orgId);
+      db.prepare(
+        `INSERT INTO memberships (user_id, organization_id, role)
+         SELECT id, ?, CASE WHEN role IN ('admin', 'manager', 'viewer') THEN role ELSE 'viewer' END FROM admin_users`
+      ).run(orgId);
+      db.prepare(`UPDATE admin_users SET is_platform_admin = 1 WHERE role = 'admin'`).run();
+      db.prepare('UPDATE admin_requests SET organization_id = ? WHERE organization_id IS NULL').run(orgId);
+      db.prepare('UPDATE audit_log SET organization_id = ? WHERE organization_id IS NULL').run(orgId);
+    }
+    db.pragma('user_version = 1');
+  })();
+}
 
 module.exports = db;

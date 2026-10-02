@@ -46,7 +46,8 @@ function resolveRange({ preset, from, to }, now = new Date()) {
   return { ...presetRange(p, now), preset: p };
 }
 
-function utilization(range) {
+// Alltid for én bedrift: rom og bookinger fra andre bedrifter tas aldri med.
+function utilization(range, orgId) {
   const start = time.zonedTimeToUtc(range.from.year, range.from.month, range.from.day, 0, 0);
   const endDay = time.addDays(range.to.year, range.to.month, range.to.day, 1);
   const end = time.zonedTimeToUtc(endDay.year, endDay.month, endDay.day, 0, 0);
@@ -55,13 +56,13 @@ function utilization(range) {
 
   const bookings = db
     .prepare(
-      `SELECT room_id, start_time, end_time, status FROM bookings
-       WHERE start_time < ? AND end_time > ? AND status IN ('confirmed', 'cancelled')`
+      `SELECT b.room_id, b.start_time, b.end_time, b.status FROM bookings b JOIN rooms r ON r.id = b.room_id
+       WHERE b.start_time < ? AND b.end_time > ? AND b.status IN ('confirmed', 'cancelled') AND r.organization_id = ?`
     )
-    .all(endIso, startIso);
+    .all(endIso, startIso, orgId);
 
   const weekdayMinutes = [0, 0, 0, 0, 0, 0, 0];
-  const rooms = Rooms.all().map((room) => {
+  const rooms = Rooms.all(orgId).map((room) => {
     const rules = Rules.rulesOf(room);
     const openFrom = time.parseHHMM(rules.openFrom);
     const openTo = time.parseHHMM(rules.openTo);
@@ -125,15 +126,15 @@ function utilization(range) {
 }
 
 // Alle bookinger i perioden, til eksport.
-function bookingsBetween(startIso, endIso) {
+function bookingsBetween(startIso, endIso, orgId) {
   return db
     .prepare(
       `SELECT b.*, r.name AS room_name, a.username AS admin_username FROM bookings b
        JOIN rooms r ON r.id = b.room_id LEFT JOIN admin_users a ON a.id = b.created_by_admin_id
-       WHERE b.start_time < ? AND b.end_time > ? AND b.status IN ('confirmed', 'cancelled')
+       WHERE b.start_time < ? AND b.end_time > ? AND b.status IN ('confirmed', 'cancelled') AND r.organization_id = ?
        ORDER BY b.start_time`
     )
-    .all(endIso, startIso);
+    .all(endIso, startIso, orgId);
 }
 
 // CSV for norsk Excel: semikolon, BOM, og vern mot formler i celler (CSV-injeksjon).

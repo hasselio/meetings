@@ -10,7 +10,7 @@
       <%- include('../partials/brand', { tag: 'Admin' }) %>
       <span class="success-icon"><%- include('../partials/icon', { name: 'check', size: 20 }) %></span>
       <h1 class="title">Forespørselen er sendt</h1>
-      <p class="lede">En administrator ser på den så snart som mulig. Du får svar på e-post, og kan logge inn når den er godkjent.</p>
+      <p class="lede"><%= locals.org ? 'Administratorene i ' + org.name : 'En administrator' %> ser på den så snart som mulig. Du får svar på e-post, og kan logge inn når den er godkjent.</p>
       <a class="btn btn-secondary" href="/">Til romoversikten</a>
     </div>
   </main>

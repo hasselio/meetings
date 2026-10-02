@@ -19,7 +19,7 @@
       <% } %>
     </nav>
     <div class="nav nav-secondary">
-      <a class="nav-link" href="/" data-preview aria-label="Se som besøkende">
+      <a class="nav-link" href="<%= locals.org ? "/b/" + org.slug : "/" %>" data-preview aria-label="Se som besøkende">
         <%- include('icon', { name: 'monitor', size: 15 }) %> <span class="nav-text">Se som besøkende</span>
       </a>
       <%- include('theme-toggle') %>
@@ -34,3 +34,37 @@
     </div>
   </div>
 </header>
+<% if (locals.me) { const orgList = locals.orgs || []; %>
+  <div class="org-bar">
+    <div class="container">
+      <div class="org-bar-current">
+        <%- include('icon', { name: 'building', size: 15 }) %>
+        <% if (orgList.length > 1) { %>
+          <form method="post" action="/admin/bedrift" class="org-switch">
+            <input type="hidden" name="section" value="<%= locals.section || '' %>" />
+            <label class="sr-only" for="orgSwitch">Bedrift du jobber i</label>
+            <select id="orgSwitch" name="org" data-autosubmit>
+              <% orgList.forEach(function (o) { %>
+                <option value="<%= o.id %>" <%= locals.org && o.id === locals.org.id ? 'selected' : '' %>><%= o.name %><%= o.active ? '' : ' (deaktivert)' %></option>
+              <% }) %>
+            </select>
+            <noscript><button type="submit" class="btn btn-secondary btn-sm">Bytt</button></noscript>
+          </form>
+        <% } else if (locals.org) { %>
+          <strong><%= org.name %></strong>
+        <% } else { %>
+          <span class="muted">Ingen bedrifter ennå</span>
+        <% } %>
+        <% if (locals.org && !org.active) { %><span class="tag tag-warning">Deaktivert</span><% } %>
+        <span class="org-bar-role">
+          <%= me.is_platform_admin ? 'Plattformadministrator' : (me.role ? roleLabel(me.role) : '') %>
+        </span>
+      </div>
+      <% if (me.is_platform_admin) { %>
+        <a class="org-bar-link" href="/admin/plattform" <%- locals.section === 'platform' ? 'aria-current="page"' : '' %>>
+          <%- include('icon', { name: 'shield', size: 14 }) %>Plattform
+        </a>
+      <% } %>
+    </div>
+  </div>
+<% } %>

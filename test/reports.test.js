@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { db, models, createAdmin, login, createRoom, at } = require('./helpers');
+const { db, models, createAdmin, login, createRoom, testOrg, at } = require('./helpers');
 const Reports = require('../src/reports');
 
 const room = createRoom({ name: 'Målerommet' });
@@ -17,7 +17,7 @@ models.RoomBlocks.create({ roomId: room.id, start: at('2030-03-08', '00:00'), en
 
 test('utnyttelse = bookede timer / åpne timer minus sperringer', () => {
   const range = Reports.resolveRange({ from: week.from, to: week.to });
-  const { rooms, weekdays } = Reports.utilization(range);
+  const { rooms, weekdays } = Reports.utilization(range, testOrg().id);
   const r = rooms.find((x) => x.id === room.id);
   assert.equal(r.availableHours, 32); // 4 åpne dager × 8 t (fredag sperret)
   assert.equal(r.bookedHours, 6);
@@ -34,7 +34,7 @@ test('CSV er trygg mot formler, bruker semikolon og BOM, og eksporten logges', a
   const res = await agent.get(`/admin/rapporter/bookinger.csv?fra=${week.from}&til=${week.to}`);
   assert.equal(res.status, 200);
   assert.match(res.headers['content-type'], /text\/csv/);
-  assert.match(res.headers['content-disposition'], /bookinger_2030-03-04_2030-03-10\.csv/);
+  assert.match(res.headers['content-disposition'], /bookinger_testbedrift_2030-03-04_2030-03-10\.csv/);
   const text = res.text;
   assert.ok(text.startsWith('﻿'));
   assert.match(text, /^﻿Dato;Fra;Til;Rom;Tittel;Navn;E-post;Status;Gjentas;Booket av admin\r\n/);
