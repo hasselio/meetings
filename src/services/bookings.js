@@ -85,7 +85,7 @@ const roomById = (id) => Rooms.get(id);
  * occurrences: [{ start, end }] i UTC. series: { rule, skipConflicts } for gjentakende møter.
  * actor: { type: 'visitor' | 'admin', req }.
  */
-async function create({ room, input, occurrences, series = null, actor, bypassRules = false }) {
+async function create({ room, input, occurrences, series = null, actor, bypassRules = false, notify = true }) {
   const now = new Date();
   const pending = needsConfirmation(actor);
   const seriesId = series ? crypto.randomUUID() : null;
@@ -147,9 +147,11 @@ async function create({ room, input, occurrences, series = null, actor, bypassRu
     first
   );
 
-  const mail = await safely(`e-post for booking #${first.id}`, () =>
-    pending ? mailer.sendConfirmRequest(bookings, room) : mailer.sendInvitation(bookings, room)
-  );
+  const mail = notify
+    ? await safely(`e-post for booking #${first.id}`, () =>
+        pending ? mailer.sendConfirmRequest(bookings, room) : mailer.sendInvitation(bookings, room)
+      )
+    : { sent: false };
 
   return {
     ok: true,
@@ -159,6 +161,7 @@ async function create({ room, input, occurrences, series = null, actor, bypassRu
     mailSent: Boolean(mail.sent),
     // Uten e-post er lenken på kvitteringssiden den eneste måten å endre eller avbestille på.
     manageUrl: !pending && !mail.sent ? manageUrl(first) : null,
+    notified: notify,
   };
 }
 
@@ -226,6 +229,12 @@ async function update(booking, changes, { actor, bypassRules = false, notify = t
   );
 
   let mailSent = false;
+  // Ny e-postadresse: den gamle mottakeren får avlysning, den nye får invitasjonen under.
+  if (notify && booking.status === 'confirmed' && updated.organizer_email !== booking.organizer_email) {
+    await safely(`avlysning til tidligere adresse for booking #${booking.id}`, () =>
+      mailer.sendCancellation([{ ...booking, ics_sequence: updated.ics_sequence }], roomById, { wholeSeries: false })
+    );
+  }
   if (notify && updated.status === 'confirmed') {
     const all = updated.series_id ? Bookings.bySeries(updated.series_id) : [updated];
     mailSent = Boolean((await safely(`endring for booking #${updated.id}`, () => mailer.sendInvitation(all, roomById, { updated: true }))).sent);

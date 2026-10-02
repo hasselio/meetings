@@ -10,8 +10,11 @@
     <div class="page-head">
       <div>
         <h1 class="title">Bookinger</h1>
-        <p class="lede">Klikk på et møte for å se hvem som har booket, eller avlyse det.</p>
+        <p class="lede"><%= can('bookings.manage') ? 'Klikk på et møte for å se detaljer, endre eller avlyse. Dra over en ledig tid for å booke på vegne av noen, eller dra et møte for å flytte det.' : 'Klikk på et møte for å se hvem som har booket.' %></p>
       </div>
+      <% if (activeRoom && can('bookings.manage')) { %>
+        <button type="button" class="btn btn-primary" id="newBookingBtn"><%- include('../partials/icon', { name: 'plus', size: 16 }) %>Ny booking</button>
+      <% } %>
     </div>
 
     <% if (!activeRoom) { %>
@@ -52,7 +55,10 @@
       </div>
 
       <section class="calendar-card" aria-label="Kalender for <%= activeRoom.name %>">
-        <div id="calendar" data-room-id="<%= activeRoom.id %>" data-room-color="<%= activeRoom.color %>"></div>
+        <div id="calendar" data-room-id="<%= activeRoom.id %>" data-room-color="<%= activeRoom.color %>"
+          data-can-manage="<%= can('bookings.manage') ? '1' : '' %>"
+          data-open-from="<%= ruleConfig.openFrom %>" data-open-to="<%= ruleConfig.openTo %>"
+          data-open-days="<%= ruleConfig.openDays.join(',') %>"></div>
       </section>
     <% } %>
   </main>
@@ -60,22 +66,109 @@
   <div class="overlay" id="overlay"></div>
   <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
     <div class="drawer-head">
-      <h2 class="drawer-title" id="drawerTitle"></h2>
+      <div>
+        <p class="eyebrow drawer-eyebrow" id="drawerEyebrow"></p>
+        <h2 class="drawer-title" id="drawerTitle"></h2>
+      </div>
       <button type="button" class="btn btn-ghost btn-icon" id="drawerClose" aria-label="Lukk"><%- include('../partials/icon', { name: 'x', size: 18 }) %></button>
     </div>
-    <div class="drawer-body">
-      <dl class="details">
-        <div><dt>Tid</dt><dd class="tabular" id="dWhen"></dd></div>
-        <div><dt>Rom</dt><dd id="dRoom"></dd></div>
-        <div><dt>Booket av</dt><dd id="dName"></dd></div>
-        <div><dt>E-post</dt><dd><a id="dEmail"></a></dd></div>
-        <div id="dNotesWrap"><dt>Notat</dt><dd id="dNotes"></dd></div>
-      </dl>
+
+    <div class="drawer-view" id="drawerView">
+      <div class="drawer-body">
+        <dl class="details">
+          <div><dt>Tid</dt><dd class="tabular" id="dWhen"></dd></div>
+          <div><dt>Rom</dt><dd id="dRoom"></dd></div>
+          <div id="dStatusWrap"><dt>Status</dt><dd id="dStatus"></dd></div>
+          <div id="dSeriesWrap"><dt>Gjentas</dt><dd id="dSeries"></dd></div>
+          <div><dt>Booket av</dt><dd id="dName"></dd></div>
+          <div><dt>E-post</dt><dd><a id="dEmail"></a></dd></div>
+          <div id="dNotesWrap"><dt>Notat</dt><dd id="dNotes"></dd></div>
+        </dl>
+      </div>
+      <% if (can('bookings.manage')) { %>
+        <div class="drawer-foot drawer-foot-split">
+          <button type="button" class="btn btn-secondary" id="editBookingBtn"><%- include('../partials/icon', { name: 'pencil', size: 15 }) %>Endre</button>
+          <span class="drawer-foot-actions">
+            <button type="button" class="btn btn-danger" id="cancelSeriesBtn" data-confirm-label="Bekreft: hele serien" hidden>Avlys serien</button>
+            <button type="button" class="btn btn-danger" id="cancelBookingBtn" data-confirm-label="Bekreft avlysning">Avlys møte</button>
+          </span>
+        </div>
+      <% } %>
     </div>
-    <% if (can('bookings.manage')) { %>
-    <div class="drawer-foot">
-      <button type="button" class="btn btn-danger" id="cancelBookingBtn" data-confirm-label="Bekreft avlysning">Avlys møte</button>
-    </div>
+
+    <% if (can('bookings.manage') && activeRoom) { %>
+      <form class="drawer-form" id="adminBookingForm" novalidate hidden>
+        <div class="drawer-body">
+          <div id="adminFormAlert" role="alert"></div>
+          <p class="drawer-note" id="movedNote" hidden></p>
+          <div class="field">
+            <label for="fRoom">Rom</label>
+            <select class="input" id="fRoom" name="roomId">
+              <% rooms.forEach(function (r) { %><option value="<%= r.id %>"><%= r.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="field-row field-row-3">
+            <div class="field">
+              <label for="fDate">Dato</label>
+              <input class="input" type="date" id="fDate" name="date" required />
+            </div>
+            <div class="field">
+              <label for="fStart">Fra</label>
+              <input class="input" type="time" id="fStart" name="startTime" step="900" required />
+            </div>
+            <div class="field">
+              <label for="fEnd">Til</label>
+              <input class="input" type="time" id="fEnd" name="endTime" step="900" required />
+            </div>
+          </div>
+          <div class="field">
+            <label for="fTitle">Hva er møtet?</label>
+            <input class="input" type="text" id="fTitle" name="title" maxlength="120" required />
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="fName">Navn</label>
+              <input class="input" type="text" id="fName" name="organizerName" maxlength="80" required />
+            </div>
+            <div class="field">
+              <label for="fEmail">E-post</label>
+              <input class="input" type="email" id="fEmail" name="organizerEmail" maxlength="120" required />
+            </div>
+          </div>
+          <div class="field">
+            <label for="fNotes">Notat <span class="label-hint">(valgfritt)</span></label>
+            <textarea class="input" id="fNotes" name="notes" rows="2" maxlength="500"></textarea>
+          </div>
+          <div class="new-only">
+            <div class="field-row">
+              <div class="field">
+                <label for="fRepeat">Gjentas</label>
+                <select class="input" id="fRepeat" name="repeat">
+                  <option value="none">Nei, bare én gang</option>
+                  <% Object.entries(repeatPatterns).forEach(function ([key, p]) { %><option value="<%= key %>"><%= p.label %></option><% }) %>
+                </select>
+              </div>
+              <div class="field" id="fUntilField" hidden>
+                <label for="fUntil">Til og med</label>
+                <input class="input" type="date" id="fUntil" name="repeatUntil" />
+              </div>
+            </div>
+            <label class="check" id="fSkipField" hidden>
+              <input type="checkbox" id="fSkip" name="skipConflicts" checked />
+              <span>Hopp over datoer som er opptatt</span>
+            </label>
+          </div>
+          <label class="check">
+            <input type="checkbox" id="fNotify" name="notify" checked />
+            <span id="fNotifyLabel">Send kalenderinvitasjon til personen</span>
+          </label>
+          <p class="drawer-note">Som administrator kan du booke utenfor rommets regler, men tiden må være ledig.</p>
+        </div>
+        <div class="drawer-foot">
+          <button type="button" class="btn btn-ghost" id="formCancelBtn">Avbryt</button>
+          <button type="submit" class="btn btn-primary" id="formSubmitBtn">Lagre</button>
+        </div>
+      </form>
     <% } %>
   </aside>
 

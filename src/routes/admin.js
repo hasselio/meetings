@@ -18,6 +18,8 @@ const audit = require('../audit');
 const Facilities = require('../facilities');
 const Rules = require('../rules');
 const time = require('../time');
+const Recurrence = require('../recurrence');
+const { bookingFields } = require('../validation');
 const config = require('../config');
 
 const router = express.Router();
@@ -199,7 +201,14 @@ function renderRoomForm(res, room, error) {
 router.get('/', (req, res) => {
   const rooms = Rooms.all();
   const activeRoom = rooms.find((r) => String(r.id) === req.query.rom) || rooms[0] || null;
-  res.render('admin/dashboard', { rooms, activeRoom, timezone: config.timezone });
+  res.render('admin/dashboard', {
+    rooms,
+    activeRoom,
+    timezone: config.timezone,
+    ruleConfig: activeRoom ? Rules.rulesOf(activeRoom) : null,
+    repeatPatterns: Recurrence.PATTERNS,
+    maxOccurrences: Recurrence.MAX_OCCURRENCES,
+  });
 });
 
 // --- Rom ---
@@ -390,8 +399,10 @@ router.get('/api/rooms/:id/events', (req, res) => {
   if (!range) return res.status(400).json({ error: 'Gyldig start og end er påkrevd' });
 
   const bookings = Bookings.forRoomBetween(room.id, range.start, range.end);
+  const nowIso = new Date().toISOString();
   const events = bookings.map((b) => ({
     id: b.id,
+    editable: b.end_time > nowIso,
     start: b.start_time,
     end: b.end_time,
     title: b.title,
@@ -399,6 +410,9 @@ router.get('/api/rooms/:id/events', (req, res) => {
     extendedProps: {
       status: b.status,
       seriesId: b.series_id,
+      seriesLabel: Recurrence.describe(b.series_rule),
+      createdByAdmin: Boolean(b.created_by_admin_id),
+      roomId: room.id,
       color: room.color,
       roomName: room.name,
       organizerName: b.organizer_name,
@@ -422,6 +436,73 @@ router.get('/api/bookings/:id', (req, res) => {
   const booking = Bookings.get(req.params.id);
   if (!booking) return res.status(404).json({ error: 'Booking ikke funnet' });
   res.json(booking);
+});
+
+// Admin booker på vegne av andre. Romreglene gjelder ikke, men tiden må være ledig og ikke sperret.
+router.post('/api/rooms/:id/bookings', requirePermission('bookings.manage'), async (req, res) => {
+  const room = Rooms.get(req.params.id);
+  if (!room) return res.status(404).json({ error: 'Rom ikke funnet' });
+  const { values, error } = bookingFields(req.body);
+  if (error) return res.status(400).json({ error });
+  const start = new Date(req.body.start);
+  const end = new Date(req.body.end);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return res.status(400).json({ error: 'Velg dato og tidspunkt.' });
+
+  let occurrences = [{ start, end }];
+  let series = null;
+  if (req.body.repeat && req.body.repeat !== 'none') {
+    const expanded = Recurrence.expand({ start, end, pattern: req.body.repeat, until: req.body.repeatUntil });
+    if (expanded.error) return res.status(400).json({ error: expanded.error });
+    occurrences = expanded.occurrences;
+    series = { rule: expanded.rule, skipConflicts: Boolean(req.body.skipConflicts) };
+  }
+
+  const result = await BookingService.create({
+    room,
+    input: values,
+    occurrences,
+    series,
+    actor: { type: 'admin', req },
+    bypassRules: true,
+    notify: req.body.notify !== false,
+  });
+  if (!result.ok) return res.status(result.status).json({ error: result.error, code: result.code });
+  res.status(201).json({
+    count: result.bookings.length,
+    skipped: result.skipped.map((o) => ({ when: time.formatRange(o.start, o.end), reason: o.reason })),
+    mailSent: result.mailSent,
+    start: result.bookings[0].start_time,
+  });
+});
+
+// Endre tid, rom eller detaljer. Brukes både fra skjemaet og etter dra-og-slipp i kalenderen.
+router.patch('/api/bookings/:id', requirePermission('bookings.manage'), async (req, res) => {
+  const booking = Bookings.get(req.params.id);
+  if (!booking || booking.status === 'cancelled') return res.status(404).json({ error: 'Booking ikke funnet' });
+  if (new Date(booking.end_time) <= new Date()) return res.status(400).json({ error: 'Møter som er over, kan ikke endres.' });
+
+  const { values, error } = bookingFields({
+    title: req.body.title ?? booking.title,
+    organizerName: req.body.organizerName ?? booking.organizer_name,
+    organizerEmail: req.body.organizerEmail ?? booking.organizer_email,
+    notes: req.body.notes ?? booking.notes,
+  });
+  if (error) return res.status(400).json({ error });
+  const changes = { ...values };
+  if (req.body.roomId) changes.roomId = Number(req.body.roomId);
+  if (req.body.start) changes.start = new Date(req.body.start);
+  if (req.body.end) changes.end = new Date(req.body.end);
+  if ([changes.start, changes.end].some((d) => d && Number.isNaN(d.getTime()))) {
+    return res.status(400).json({ error: 'Velg dato og tidspunkt.' });
+  }
+
+  const result = await BookingService.update(booking, changes, {
+    actor: { type: 'admin', req },
+    bypassRules: true,
+    notify: req.body.notify !== false,
+  });
+  if (!result.ok) return res.status(result.status).json({ error: result.error, code: result.code });
+  res.json({ booking: result.booking, mailSent: result.mailSent });
 });
 
 router.post('/api/bookings/:id/cancel', requirePermission('bookings.manage'), async (req, res) => {

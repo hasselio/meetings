@@ -2823,3 +2823,49 @@ body > main {
   background: var(--busy-bg);
   font-size: 13px;
 }
+
+/* ---------- Skuffen i adminkalenderen ---------- */
+
+.drawer-view,
+.drawer-form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.drawer-view[hidden],
+.drawer-form[hidden],
+.new-only[hidden],
+.details > div[hidden],
+.drawer-note[hidden] {
+  display: none;
+}
+
+.drawer-eyebrow {
+  margin-bottom: 4px;
+}
+
+.drawer-foot-split {
+  justify-content: space-between;
+}
+
+.drawer-foot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.drawer-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+#movedNote {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13px;
+}
