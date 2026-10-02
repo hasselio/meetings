@@ -130,7 +130,7 @@ All data ligger i `data/mettings.db` (SQLite). Denne filen er ikke sjekket inn i
 - E-postbekreftelse sendes som en ekte kalenderinvitasjon (`METHOD:REQUEST`), slik at booker kan trykke "Godta" og få møtet inn i sin egen kalender. Avlysning sendes som `METHOD:CANCEL`.
 - Overlappende bookinger på samme rom avvises på serversiden.
 - Frontend bruker [FullCalendar](https://fullcalendar.io/) (med norsk lokalisering) og fonten [Geist](https://vercel.com/font), begge selv-hostet under `public/vendor/` — ingen internettilgang er nødvendig når tjenesten kjører.
-- Grensesnittet følger systemets lys/mørk-modus og respekterer «redusert bevegelse».
+- Grensesnittet følger systemets lys/mørk-modus til brukeren velger selv med knappen i toppen. Valget huskes i nettleseren. «Redusert bevegelse» respekteres.
 - Kalender og bookingskjema viser tider i besøkerens lokale tidssone; kalenderinvitasjonen sendes i UTC, så den havner riktig i mottakerens kalender uansett hvor de befinner seg.
 
 ## Videre arbeid (forslag)

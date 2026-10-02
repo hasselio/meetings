@@ -1,17 +1,19 @@
 <a class="skip-link" href="#innhold">Hopp til innhold</a>
-<header class="site-header">
+<header class="site-header site-header-admin">
   <div class="container">
     <%- include('brand', { href: '/admin', tag: 'Admin' }) %>
-    <nav class="nav" aria-label="Adminmeny">
+    <nav class="nav nav-primary" aria-label="Adminmeny">
       <a class="nav-link" href="/admin" <%- locals.section === 'bookings' ? 'aria-current="page"' : '' %>>Bookinger</a>
       <a class="nav-link" href="/admin/rom" <%- locals.section === 'rooms' ? 'aria-current="page"' : '' %>>Rom</a>
       <a class="nav-link" href="/admin/tilgang" <%- locals.section === 'access' ? 'aria-current="page"' : '' %>>
         Tilgang<% if (locals.pendingCount) { %> <span class="badge" aria-label="<%= pendingCount %> venter"><%= pendingCount %></span><% } %>
       </a>
-      <span class="nav-divider" aria-hidden="true"></span>
+    </nav>
+    <div class="nav nav-secondary">
       <a class="nav-link" href="/" data-preview aria-label="Se som besøkende">
         <%- include('icon', { name: 'monitor', size: 15 }) %> <span class="nav-text">Se som besøkende</span>
       </a>
+      <%- include('theme-toggle') %>
       <a class="nav-link" href="/admin/konto" <%- locals.section === 'account' ? 'aria-current="page"' : '' %> aria-label="Min konto">
         <%- include('icon', { name: 'user', size: 15 }) %> <span class="nav-text">Min konto</span>
       </a>
@@ -20,6 +22,6 @@
           <%- include('icon', { name: 'logout', size: 15 }) %> <span class="nav-text">Logg ut</span>
         </button>
       </form>
-    </nav>
+    </div>
   </div>
 </header>

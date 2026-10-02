@@ -20,6 +20,7 @@
   <div class="container">
     <%- include('brand') %>
     <nav class="nav" aria-label="Hovedmeny">
+      <%- include('theme-toggle') %>
       <% if (!locals.adminPreview) { %><a class="nav-link" href="/admin">Logg inn</a><% } %>
     </nav>
   </div>

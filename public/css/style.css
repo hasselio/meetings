@@ -47,8 +47,9 @@
   --font: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
+/* Mørke farger: følger systemet, med mindre brukeren har valgt tema selv (data-theme). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #141312;
     --surface: #1c1b19;
     --surface-2: #262421;
@@ -71,6 +72,35 @@
     --shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -10px rgb(0 0 0 / 0.6);
     --shadow-lg: 0 24px 56px -16px rgb(0 0 0 / 0.75);
   }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #141312;
+  --surface: #1c1b19;
+  --surface-2: #262421;
+  --border: #2e2c29;
+  --border-strong: #3d3a36;
+  --text: #f2f0ec;
+  --text-2: #b4afa7;
+  --text-3: #827d75;
+  --ink: #f2f0ec;
+  --ink-hover: #d9d5ce;
+  --ink-fg: #141312;
+  --free: #63c08b;
+  --free-bg: rgb(99 192 139 / 0.13);
+  --busy: #e2806a;
+  --busy-bg: rgb(226 128 106 / 0.13);
+  --hatch: rgb(242 240 236 / 0.08);
+  --danger: #e5584f;
+  --danger-hover: #f07068;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -10px rgb(0 0 0 / 0.6);
+  --shadow-lg: 0 24px 56px -16px rgb(0 0 0 / 0.75);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
 }
 
 *,
@@ -1129,13 +1159,6 @@ textarea.input {
   display: flex;
   gap: 8px;
   margin-top: 22px;
-}
-
-.nav-divider {
-  width: 1px;
-  height: 18px;
-  margin: 0 6px;
-  background: var(--border-strong);
 }
 
 .badge {
@@ -2217,7 +2240,6 @@ html:has(.preview-dialog[open]) {
 
 @media (max-width: 640px) {
   .nav-text,
-  .nav-divider,
   .brand-tag {
     display: none;
   }
@@ -2276,5 +2298,84 @@ html:has(.preview-dialog[open]) {
   .chip:active,
   .fc .fc-button:active {
     transform: none;
+  }
+}
+
+/* ---------- Tema-bryter ---------- */
+
+.theme-toggle {
+  padding: 7px;
+}
+
+.theme-icon-to-light {
+  display: none;
+}
+
+:root[data-theme='dark'] .theme-icon-to-dark {
+  display: none;
+}
+
+:root[data-theme='dark'] .theme-icon-to-light {
+  display: inline;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .theme-icon-to-dark {
+    display: none;
+  }
+
+  :root:not([data-theme='light']) .theme-icon-to-light {
+    display: inline;
+  }
+}
+
+.auth-theme {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+}
+
+/* Mellomstore skjermer: sekundære menyvalg vises som ikoner, så hovedfanene får plass. */
+@media (max-width: 1080px) {
+  .nav-text {
+    display: none;
+  }
+}
+
+/* Adminmeny: hovedfaner og verktøy. På mobil får hovedfanene egen rad under logoen. */
+.site-header-admin .nav-primary {
+  margin-left: auto;
+}
+
+.site-header-admin .nav-secondary {
+  margin-left: 6px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-strong);
+}
+
+.nav form {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .site-header-admin .container {
+    flex-wrap: wrap;
+    height: auto;
+    padding-block: 10px 6px;
+    row-gap: 6px;
+  }
+
+  .site-header-admin .nav-secondary {
+    margin-left: auto;
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .site-header-admin .nav-primary {
+    order: 3;
+    width: calc(100% + 10px);
+    margin-left: -10px;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
 }

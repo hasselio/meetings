@@ -7,7 +7,18 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="preload" href="/vendor/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="stylesheet" href="/css/style.css" />
-<script>if (window.self !== window.top) document.documentElement.classList.add('in-frame');</script>
+<script>
+  (function () {
+    var root = document.documentElement;
+    if (window.self !== window.top) root.classList.add('in-frame');
+    // Valgt tema settes før siden tegnes, så den ikke blinker i feil farge.
+    try {
+      var theme = localStorage.getItem('theme');
+      if (theme === 'light' || theme === 'dark') root.dataset.theme = theme;
+    } catch (e) {}
+  })();
+</script>
+<script src="/js/theme.js" defer></script>
 <% if (typeof calendar !== 'undefined' && calendar) { %>
 <script src="/vendor/fullcalendar/fullcalendar.min.js" defer></script>
 <script src="/vendor/fullcalendar/nb.min.js" defer></script>
