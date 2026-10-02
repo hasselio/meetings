@@ -141,6 +141,10 @@
       fail('time', `Rommet kan bookes i maks ${rules.maxMinutes} minutter om gangen.`);
     }
 
+    if (range && repeatSelect.value !== 'none' && countOccurrences() > MAX_OCCURRENCES) {
+      fail('time', `En serie kan ha maks ${MAX_OCCURRENCES} møter. Velg en tidligere sluttdato.`);
+    }
+
     if (!form.title.value.trim()) fail('title', 'Skriv kort hva møtet gjelder.');
     if (!form.organizerName.value.trim()) fail('organizerName', 'Skriv inn navnet ditt.');
     const email = form.organizerEmail.value.trim();
@@ -255,6 +259,8 @@
   document.getElementById('newBookingBtn').addEventListener('click', () => {
     form.title.value = '';
     form.notes.value = '';
+    repeatSelect.value = 'none';
+    updateRepeat();
     showForm();
     const { start, end } = defaultRange();
     writeRange(start, end);
@@ -288,6 +294,9 @@
       notes: form.notes.value.trim(),
       start: range.start.toISOString(),
       end: range.end.toISOString(),
+      repeat: repeatSelect.value,
+      repeatUntil: form.repeatUntil.value,
+      skipConflicts: form.skipConflicts.checked,
     };
 
     try {
@@ -315,11 +324,24 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ name: payload.organizerName, email: payload.organizerEmail }));
       } catch (_) {}
 
+      const when = `${fmtDay.format(range.start)}, ${fmtTime.format(range.start)}–${fmtTime.format(range.end)}`;
       document.getElementById('successWhen').textContent =
-        `${fmtDay.format(range.start)}, ${fmtTime.format(range.start)}–${fmtTime.format(range.end)}`;
+        data.count > 1 ? `${data.count} møter, første ${when}` : when;
+      const skippedList = document.getElementById('successSkipped');
+      skippedList.replaceChildren();
+      (data.skipped || []).forEach((s) => {
+        const li = document.createElement('li');
+        li.textContent = `Hoppet over ${s.when}: ${s.reason}`;
+        skippedList.append(li);
+      });
+      skippedList.hidden = !(data.skipped && data.skipped.length);
       document.getElementById('successTitleText').textContent = payload.title;
       const pending = data.status === 'pending';
-      document.getElementById('successTitle').textContent = pending ? 'Sjekk e-posten din' : 'Møtet er booket';
+      document.getElementById('successTitle').textContent = pending
+        ? 'Sjekk e-posten din'
+        : data.count > 1
+          ? 'Møtene er booket'
+          : 'Møtet er booket';
       document.getElementById('successMail').textContent = pending
         ? `Vi har sendt en lenke til ${payload.organizerEmail}. Åpne den innen ${data.holdMinutes} minutter for å bekrefte; tiden holdes av til da.`
         : data.mailSent
@@ -345,6 +367,53 @@
       submitBtn.textContent = 'Book møte';
     }
   });
+
+  // --- Gjentakelse ---
+  const repeatSelect = form.repeat;
+  const untilField = document.getElementById('repeatUntilField');
+  const repeatExtra = document.getElementById('repeatExtra');
+  const repeatSummary = document.getElementById('repeatSummary');
+  const MAX_OCCURRENCES = Number(calendarEl.dataset.maxOccurrences) || 26;
+  const DEFAULT_WEEKS = { weekdays: 1, weekly: 4, biweekly: 8 };
+
+  function countOccurrences() {
+    const range = readRange();
+    if (!range || !form.repeatUntil.value) return 0;
+    const until = new Date(`${form.repeatUntil.value}T23:59`);
+    const step = repeatSelect.value === 'biweekly' ? 14 : repeatSelect.value === 'weekly' ? 7 : 1;
+    let n = 0;
+    for (const d = new Date(range.start); d <= until && n <= MAX_OCCURRENCES; d.setDate(d.getDate() + step)) {
+      if (repeatSelect.value === 'weekdays' && (d.getDay() === 0 || d.getDay() === 6)) continue;
+      n++;
+    }
+    return n;
+  }
+
+  function updateRepeat({ resetUntil = false } = {}) {
+    const repeating = repeatSelect.value !== 'none';
+    untilField.hidden = !repeating;
+    repeatExtra.hidden = !repeating;
+    if (!repeating) return;
+    const range = readRange();
+    if ((resetUntil || !form.repeatUntil.value) && range) {
+      const until = new Date(range.start);
+      until.setDate(until.getDate() + DEFAULT_WEEKS[repeatSelect.value] * 7 - (repeatSelect.value === 'weekdays' ? 3 : 0));
+      form.repeatUntil.value = toDateValue(until);
+    }
+    if (range) form.repeatUntil.min = toDateValue(range.start);
+    const n = countOccurrences();
+    if (n > MAX_OCCURRENCES) {
+      repeatSummary.textContent = `For mange møter: maks ${MAX_OCCURRENCES} i en serie. Velg en tidligere dato.`;
+      repeatSummary.setAttribute('data-warn', '');
+    } else {
+      repeatSummary.textContent = n ? `${n} møter i serien.` : '';
+      repeatSummary.removeAttribute('data-warn');
+    }
+  }
+
+  repeatSelect.addEventListener('change', () => updateRepeat({ resetUntil: true }));
+  form.repeatUntil.addEventListener('change', () => updateRepeat());
+  ['date', 'startTime', 'endTime'].forEach((name) => form[name].addEventListener('change', () => updateRepeat()));
 
   let captchaPayload = null;
   if (widget) {

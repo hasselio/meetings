@@ -9,6 +9,7 @@ const mailer = require('../services/mailer');
 const { bookingFields } = require('../validation');
 const { hashToken, isTokenShape } = require('../tokens');
 const Rules = require('../rules');
+const Recurrence = require('../recurrence');
 const Facilities = require('../facilities');
 const time = require('../time');
 const config = require('../config');
@@ -44,6 +45,8 @@ router.get('/rom/:id', (req, res) => {
   if (!room) return res.status(404).render('public/not-found');
   res.render('public/room', {
     room,
+    repeatPatterns: Recurrence.PATTERNS,
+    maxOccurrences: Recurrence.MAX_OCCURRENCES,
     facilityList: Facilities.describe(room.facilities),
     rules: Rules.describe(room),
     ruleConfig: Rules.rulesOf(room),
@@ -119,10 +122,20 @@ router.post('/api/rooms/:id/bookings', verifyBookingCaptcha, async (req, res) =>
     });
   }
 
+  let occurrences = [{ start, end }];
+  let series = null;
+  if (req.body.repeat && req.body.repeat !== 'none') {
+    const expanded = Recurrence.expand({ start, end, pattern: req.body.repeat, until: req.body.repeatUntil });
+    if (expanded.error) return res.status(400).json({ error: expanded.error, code: 'repeat' });
+    occurrences = expanded.occurrences;
+    series = { rule: expanded.rule, skipConflicts: Boolean(req.body.skipConflicts) };
+  }
+
   const result = await BookingService.create({
     room,
     input: values,
-    occurrences: [{ start, end }],
+    occurrences,
+    series,
     actor: { type: 'visitor', req },
   });
   if (!result.ok) return res.status(result.status).json({ error: result.error, code: result.code });
@@ -130,6 +143,8 @@ router.post('/api/rooms/:id/bookings', verifyBookingCaptcha, async (req, res) =>
   bookingLimiter.hit(req.ip);
   res.status(201).json({
     status: result.pending ? 'pending' : 'confirmed',
+    count: result.bookings.length,
+    skipped: result.skipped.map((o) => ({ when: time.formatRange(o.start, o.end), reason: o.reason })),
     mailSent: result.mailSent,
     manageUrl: result.manageUrl,
     holdMinutes: config.pendingHoldMinutes,
